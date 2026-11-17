@@ -2,12 +2,13 @@
 
 Un bac à sable d'écosystème : peins des forêts, des prairies, des lacs, ajoute des animaux, et regarde la nature s'organiser toute seule.
 
-Ouvre `index.html` dans un navigateur récent (WebGL2). Aucune installation. Le bouton 🌍 charge une vallée d'exemple.
+Ouvre `index.html` dans un navigateur récent (WebGL2). Aucune installation. Le bouton globe crée un **monde aléatoire** : relief, rivières et lacs (parfois presque pas d'eau), forêts, prairies, et une faune tirée selon l'habitat. Tu peux fixer l'eau, la forêt ou les prédateurs pour comparer, ou rejouer un monde à partir de son numéro (Chronique → « Rejouer ce monde »).
 
 ## Comment jouer
 
 - Choisis une plante, un terrain ou un animal dans la barre du bas et peins sur la carte (taille du pinceau : curseur, `[` `]` ou Maj + molette).
-- **▶ Lancer la vie**, puis accélère le temps (×4, ×16) pour voir les saisons et les générations passer.
+- **Lancer la vie**, puis accélère le temps (×4, ×16, ×64 ≈ 2 min par an) ou fais un voyage dans le temps.
+- **Calendrier réel** : années de 364 jours, saisons de 3 mois, dates. Un jour dure 24 s à ×1. Âges, gestations, maturité et longévité suivent la vraie biologie (un cerf vit une dizaine d'années, un lapin deux, une souris un an).
 - **Zoom** : molette (vers le curseur), boutons + / − / ⤢, ou pincement sur mobile. **Se déplacer** : clic droit ou molette enfoncée, Espace + glisser, deux doigts.
 - **✋ Attraper / observer** (onglet Outils) : clique sur un animal pour ouvrir sa fiche, glisse-le pour le déplacer (double-clic : fiche depuis n'importe quel outil).
 - **Fiche d'un animal** :
@@ -29,7 +30,7 @@ Ouvre `index.html` dans un navigateur récent (WebGL2). Aucune installation. Le 
 - **Génétique** : chaque animal porte 10 gènes (vitesse, taille, vue, fourrure, immunité, audace, curiosité, sociabilité, paresse, rythme). Chaque petit hérite d'un mélange de ses deux parents, avec des mutations. Chaque gène a un coût : être rapide, grand ou résistant consomme plus d'énergie. Les prédateurs attrapent d'abord les lents, les vieux et les malades, les femelles préfèrent les mâles vigoureux, et une fourrure épaisse aide l'hiver mais donne soif l'été. La sélection naturelle fait donc évoluer les espèces au fil des générations (onglet **Évolution**).
 - **Saisons de reproduction** : comme dans la nature, le brame et les accouplements des cerfs ont lieu en automne, avec naissances au printemps ; les loups, renards et lynx s'accouplent en hiver ; les oiseaux nichent au printemps. Les lapins et les souris font plusieurs portées. Un prédateur n'élève des petits que s'il y a assez de proies.
 - **Arbres** : jeunes pousses, arbres qui grandissent, graines qui colonisent les alentours, vieux arbres qui tombent et ouvrent des clairières. Les buissons pionniers reviennent sur les cendres et les prairies non broutées, puis deviennent forêt. Trop de cerfs, et les jeunes pousses sont broutées : la forêt ne se renouvelle plus.
-- **Catastrophes naturelles** (rares, liées à la saison, ou déclenchées depuis l'onglet Catastrophes) : sécheresse, grand incendie, inondation, tempête, hiver rigoureux, épidémie (plus probable quand une espèce pullule). Rien n'est garanti : des espèces peuvent disparaître, voire toute la vallée.
+- **Catastrophes naturelles** (rares, liées à la saison, ou déclenchées depuis l'onglet Catastrophes) : sécheresse, grand incendie, inondation, tempête, hiver rigoureux, épidémie (plus probable quand une espèce pullule). Rien n'est équilibré artificiellement : des espèces peuvent disparaître, voire toute la vallée. C'est fait pour observer.
 - **Voyage dans le temps** : avance de 1 à 25 ans en accéléré, puis lis le rapport : naissances, morts et leurs causes, catastrophes, disparitions, évolution génétique de chaque espèce, populations avant/après. La **Chronique** garde l'histoire de la vallée.
 - **Reproduction** : mâles et femelles, gestation, portées, petits qui suivent leur mère (les canetons en file indienne). La croissance est freinée par la densité et les saisons.
 - **Chaîne alimentaire** :

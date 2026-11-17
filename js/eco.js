@@ -770,7 +770,7 @@
       const p = nearest(i, rv, PRED[t], 0);
       if (p >= 0) {
         const pd = Math.hypot(x[p] - xi, y[p] - yi);
-        const hunting = state[p] === ST.HUNT || state[p] === ST.STALK;
+        const hunting = state[p] === ST.HUNT; // a stalking predator stays unnoticed until it charges
         const shy = 1 - tBold[i];
         // a predator that isn't hunting is watched, not fled from (unless it comes really close)
         if (!hunting && pd >= rv * (0.16 + 0.22 * shy) && pd < rv * 0.55) {
@@ -1118,7 +1118,7 @@
       kills[i]++;
       recordKill(i, j);
       const small = SP[type[j]].meat < 0.6 || (UFL[t] & F.AIR);
-      if (small) { const g = SP[type[j]].meat * 1.5 / Math.max(0.3, UR[t] * UR[t] / 20); en[i] = Math.min(1, en[i] + g); ateM[i] += g; die(j, 'eaten', i); state[i] = ST.WANDER; tgt[i] = -1; if (type[j] === U.dodo) toast('u:dodo|Et voilà… le dodo a encore disparu.', 'dodo'); }
+      if (small) { const g = SP[type[j]].meat * 1.5 / Math.max(0.3, UR[t] * UR[t] / 20); en[i] = Math.min(1, en[i] + g); ateM[i] += g; wat[i] = Math.min(1, wat[i] + g * 0.6); die(j, 'eaten', i); state[i] = ST.WANDER; tgt[i] = -1; if (type[j] === U.dodo) toast('u:dodo|Et voilà… le dodo a encore disparu.', 'dodo'); }
       else { die(j, 'killed', i); state[i] = ST.WANDER; tgt[i] = -1; cd[i] = 0; }
       G.fx.poof(x[j], y[j] - 3);
     }
@@ -1373,6 +1373,7 @@
         const cons = UR[t] * UR[t] / 40;
         const gain = Math.min(veg[ci] / cons, DT / (DAY * 0.05)) * fv;
         en[i] = Math.min(1, en[i] + gain); ateP[i] += gain;
+        wat[i] = Math.min(1, wat[i] + gain * 0.35 * veg[ci] * (S.season() === 1 ? 0.6 : 1)); // fresh grass holds water
         veg[ci] = Math.max(0, veg[ci] - gain * cons * (t === U.boar ? 1.6 : 1));
         if (t === U.boar && veg[ci] < 0.05 && rnd() < 0.002 * TK) S.setTerrain(ci, T.DIRT);
         // browsers nibble young trees: too many deer and the forest can't regenerate
@@ -1497,7 +1498,7 @@
             if (store[j] > 0) { store[j] -= g * 10; en[i] = Math.min(1, en[i] + g); ateH[i] += g; if (rnd() < 0.05) { hp[i] -= 2; flash[i] = 0.1; } toast('u:bear|Un ours pille une ruche… et se fait piquer !', 'honey'); }
             if (store[j] <= 0 || en[i] > 0.97) { state[i] = ST.WANDER; tgt[i] = -1; }
           } else {
-            store[j] -= g * UR[t] * UR[t] / 25; en[i] = Math.min(1, en[i] + g); ateM[i] += g;
+            store[j] -= g * UR[t] * UR[t] / 25; en[i] = Math.min(1, en[i] + g); ateM[i] += g; wat[i] = Math.min(1, wat[i] + g * 0.6); // meat is ~70 % water
             if (en[i] > 0.98) { state[i] = ST.WANDER; tgt[i] = -1; }
           }
         }
