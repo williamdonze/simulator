@@ -124,21 +124,26 @@
   const feed = el('div', '', '');
   feed.id = 'feed';
   document.body.appendChild(feed);
+  // each news item is a DOM node created once (it slides in once), then fades out after 45 s
   const items = [];
   G.bus.on('chronicle', (e) => {
     if (ui.skipping || e.sev < 2) return;
-    items.unshift({ e, t: performance.now() });
-    if (items.length > 4) items.pop();
-    drawFeed();
+    const d = el('div', `fi s${Math.min(4, e.sev)} ${e.x != null ? 'go' : ''}`, `${G.ico(e.icon)}<div><b>${e.title || 'Chronique'}</b><small>${G.date(e.d)}${e.r >= 0 ? ' · ' + G.regions.name(e.r) : ''}</small><span>${e.text}</span></div>`);
+    if (e.x != null) d.onclick = () => ui.flyTo(e.x, e.y);
+    feed.prepend(d);
+    items.unshift({ d, t: performance.now() });
+    while (items.length > 4) items.pop().d.remove();
     if (e.sev >= 3 || e.source === 'player') ui.toast(`${e.icon}|${e.title ? e.title + ' — ' : ''}${e.text}`);
   });
-  function drawFeed() {
+  setInterval(() => {
     const now = performance.now();
-    for (let k = items.length - 1; k >= 0; k--) if (now - items[k].t > 45000) items.splice(k, 1);
-    feed.innerHTML = items.map(({ e }, k) => `<div class="fi s${Math.min(4, e.sev)} ${e.x != null ? 'go' : ''}" data-k="${k}">${G.ico(e.icon)}<div><b>${e.title || 'Chronique'}</b><small>${G.date(e.d)}${e.r >= 0 ? ' · ' + G.regions.name(e.r) : ''}</small><span>${e.text}</span></div></div>`).join('');
-    feed.querySelectorAll('.fi.go').forEach((d) => (d.onclick = () => { const e = items[+d.dataset.k].e; ui.flyTo(e.x, e.y); }));
-  }
-  setInterval(() => { if (items.length) drawFeed(); if (panel.classList.contains('show') && G.powers.mode() === 'equilibre') { const m = panel.querySelector('.mana i'); if (m) { m.style.width = Math.min(100, S.mana || 0) + '%'; m.nextSibling.lastChild.textContent = ` ${Math.floor(S.mana || 0)} / 100`; } } }, 2000);
+    for (let k = items.length - 1; k >= 0; k--) {
+      const it = items[k];
+      if (now - it.t > 45000 && !it.out) { it.out = true; it.d.classList.add('out'); setTimeout(() => it.d.remove(), 600); items.splice(k, 1); }
+    }
+    if (panel.classList.contains('show') && G.powers.mode() === 'equilibre') { const m = panel.querySelector('.mana i'); if (m) { m.style.width = Math.min(100, S.mana || 0) + '%'; m.nextSibling.lastChild.textContent = ` ${Math.floor(S.mana || 0)} / 100`; } }
+  }, 2000);
+  G.bus.on('reset', () => { for (const it of items) it.d.remove(); items.length = 0; });
 
   // ------------------------------------------------------------------ inspector: regions & species
   const insp = el('div', 'panel', '');
