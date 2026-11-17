@@ -109,15 +109,15 @@
 
   // ------------------------------------------------------------------ camera
   const cv = $('#gl');
-  // pixel scale: each game pixel is PX screen pixels; the world is the screen divided by it
   ui.worldForScreen = function () {
     const w = cv.clientWidth || innerWidth, h = cv.clientHeight || innerHeight;
-    G.PX = Math.max(2, Math.min(4, Math.round(w / 640)));
-    return [Math.floor(w / G.PX), Math.floor(h / G.PX)];
+    const z = Math.max(0.9, Math.min(2, w / 900));
+    return [Math.round(w / z / 16) * 16, Math.round(h / z / 16) * 16];
   };
   ui.fitCamera = function () {
-    G.cam.zoom = G.PX || 2;
-    G.cam.x = 0; G.cam.y = 0;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    const z = Math.min(w / S.W, h / S.H);
+    G.cam.zoom = z; G.cam.x = S.W / 2 - w / z / 2; G.cam.y = S.H / 2 - h / z / 2;
   };
   window.addEventListener('resize', () => ui.fitCamera());
   const toWorld = (sx, sy) => [G.cam.x + sx / G.cam.zoom, G.cam.y + sy / G.cam.zoom];

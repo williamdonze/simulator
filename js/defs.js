@@ -31,19 +31,19 @@ const D = (G.D = {
 // lush / bare: ground colour with full / no vegetation. grow: vegetation regrowth per day.
 const T = (G.T = {});
 G.TERRAIN = [
-  { k: 'GRASS',   name: 'Prairie',          lush: [104, 158, 70], bare: [156, 150, 96], grow: 0.9,  spd: 1.0,  fuel: 1.2, spread: 0.6, desc: 'Herbe qui repousse. Broutée par lapins, cerfs, bisons… Surpâturée, elle devient terre nue.' },
-  { k: 'TALL',    name: 'Hautes herbes',    lush: [90, 146, 58], bare: [150, 142, 88], grow: 0.8,  spd: 0.8,  fuel: 2.2, spread: 1.4, desc: 'Cachette des souris et des lapins. Très inflammable en été.' },
-  { k: 'FLOWERS', name: 'Fleurs',           lush: [110, 162, 74], bare: [156, 150, 98], grow: 0.7,  spd: 1.0,  fuel: 1.2, spread: 0.6, desc: 'Nectar pour abeilles et papillons. Pollinisées, elles se répandent.' },
-  { k: 'BUSH',    name: 'Buissons à baies', lush: [96, 148, 62], bare: [140, 136, 90], grow: 0.35, spd: 0.6,  fuel: 4,   spread: 0.5, desc: 'Baies en été et en automne : ours, renards, sangliers, corbeaux.' },
-  { k: 'FOREST',  name: 'Forêt',            lush: [82, 130, 56], bare: [118, 114, 78], grow: 0.4,  spd: 0.6,  fuel: 9,   spread: 0.4, desc: 'Noix et abri. Les écureuils y plantent de nouveaux arbres, les castors les abattent.' },
-  { k: 'SAND',    name: 'Sable',            lush: [214, 194, 140], bare: [214, 194, 140], grow: 0,    spd: 0.85, desc: 'Plage stérile.' },
-  { k: 'MUD',     name: 'Boue',             lush: [126, 100, 72], bare: [126, 100, 72], grow: 0.1,  spd: 0.5,  desc: 'Les sangliers adorent s\'y rouler.' },
-  { k: 'ROCK',    name: 'Rochers',          lush: [138, 136, 126], bare: [138, 136, 126], grow: 0,    spd: 0,    block: 1, desc: 'Infranchissable au sol.' },
-  { k: 'DIRT',    name: 'Terre nue',        lush: [150, 124, 88], bare: [150, 124, 88], grow: 0.15, spd: 1,    desc: 'Sol à nu : l\'herbe finit par la recoloniser.' },
-  { k: 'BURNT',   name: 'Cendres',          lush: [88, 82, 74], bare: [88, 82, 74], grow: 0.25, spd: 1 },
-  { k: 'REEDS',   name: 'Roseaux',          lush: [90, 150, 138], bare: [110, 154, 160], grow: 0.8,  spd: 0.5,  water: 1, desc: 'Berge marécageuse : canards, grenouilles, hérons.' },
-  { k: 'WATER',   name: 'Eau',              lush: [86, 150, 200], bare: [86, 150, 200], grow: 0.6,  spd: 0.4,  water: 1, desc: 'Abreuvoir et algues pour les poissons. Les animaux terrestres y pataugent lentement.' },
-  { k: 'DEEP',    name: 'Eau profonde',     lush: [58, 112, 170], bare: [58, 112, 170],  grow: 0.4,  spd: 0.25, water: 1, block: 2, desc: 'Lac ou rivière profonde : infranchissable pour les animaux terrestres.' },
+  { k: 'GRASS',   name: 'Prairie',          lush: [170, 214, 120], bare: [216, 206, 160], grow: 0.9,  spd: 1.0,  fuel: 1.2, spread: 0.6, desc: 'Herbe qui repousse. Broutée par lapins, cerfs, bisons… Surpâturée, elle devient terre nue.' },
+  { k: 'TALL',    name: 'Hautes herbes',    lush: [152, 200, 92],  bare: [208, 198, 140], grow: 0.8,  spd: 0.8,  fuel: 2.2, spread: 1.4, desc: 'Cachette des souris et des lapins. Très inflammable en été.' },
+  { k: 'FLOWERS', name: 'Fleurs',           lush: [182, 216, 132], bare: [214, 206, 162], grow: 0.7,  spd: 1.0,  fuel: 1.2, spread: 0.6, desc: 'Nectar pour abeilles et papillons. Pollinisées, elles se répandent.' },
+  { k: 'BUSH',    name: 'Buissons à baies', lush: [138, 190, 100], bare: [196, 188, 140], grow: 0.35, spd: 0.6,  fuel: 4,   spread: 0.5, desc: 'Baies en été et en automne : ours, renards, sangliers, corbeaux.' },
+  { k: 'FOREST',  name: 'Forêt',            lush: [118, 176, 96],  bare: [160, 156, 116], grow: 0.4,  spd: 0.6,  fuel: 9,   spread: 0.4, desc: 'Noix et abri. Les écureuils y plantent de nouveaux arbres, les castors les abattent.' },
+  { k: 'SAND',    name: 'Sable',            lush: [242, 226, 172], bare: [242, 226, 172], grow: 0,    spd: 0.85, desc: 'Plage stérile.' },
+  { k: 'MUD',     name: 'Boue',             lush: [178, 148, 110], bare: [178, 148, 110], grow: 0.1,  spd: 0.5,  desc: 'Les sangliers adorent s\'y rouler.' },
+  { k: 'ROCK',    name: 'Rochers',          lush: [198, 194, 188], bare: [198, 194, 188], grow: 0,    spd: 0,    block: 1, desc: 'Infranchissable au sol.' },
+  { k: 'DIRT',    name: 'Terre nue',        lush: [206, 184, 142], bare: [206, 184, 142], grow: 0.15, spd: 1,    desc: 'Sol à nu : l\'herbe finit par la recoloniser.' },
+  { k: 'BURNT',   name: 'Cendres',          lush: [134, 126, 116], bare: [134, 126, 116], grow: 0.25, spd: 1 },
+  { k: 'REEDS',   name: 'Roseaux',          lush: [126, 196, 186], bare: [150, 196, 210], grow: 0.8,  spd: 0.5,  water: 1, desc: 'Berge marécageuse : canards, grenouilles, hérons.' },
+  { k: 'WATER',   name: 'Eau',              lush: [132, 202, 238], bare: [132, 202, 238], grow: 0.6,  spd: 0.4,  water: 1, desc: 'Abreuvoir et algues pour les poissons. Les animaux terrestres y pataugent lentement.' },
+  { k: 'DEEP',    name: 'Eau profonde',     lush: [74, 154, 218],  bare: [74, 154, 218],  grow: 0.4,  spd: 0.25, water: 1, block: 2, desc: 'Lac ou rivière profonde : infranchissable pour les animaux terrestres.' },
 ];
 G.TERRAIN.forEach((t, i) => (T[t.k] = i));
 
@@ -146,7 +146,7 @@ G.UALT = new Float32Array(NSP); G.UMASS = new Float32Array(NSP);
 G.PREY = new Uint32Array(NSP);   // bitmask of species this one hunts
 G.PRED = new Uint32Array(NSP);   // bitmask of species that hunt this one
 SPECIES.forEach((u, i) => {
-  G.UR[i] = u.r * 1.5; G.USPD[i] = u.spd; G.URUN[i] = u.run || u.spd; G.UVIS[i] = u.vis; G.UHP[i] = u.hp;
+  G.UR[i] = u.r; G.USPD[i] = u.spd; G.URUN[i] = u.run || u.spd; G.UVIS[i] = u.vis; G.UHP[i] = u.hp;
   G.UFL[i] = u.flags | (u.hab === HB.AIR ? F.AIR : 0); G.UDIET[i] = u.diet; G.UHAB[i] = u.hab; G.UALT[i] = u.alt || 0;
   G.UMASS[i] = u.flags & F.STATIC ? 1000 : u.r * u.r;
 });
