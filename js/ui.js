@@ -1,61 +1,60 @@
 'use strict';
 // ============================================================================
-//  Minimal UI: pick a unit, drag on the field, press Lancer.
-//  Wheel / pinch = brush size. Stats only on demand at the end.
+//  UI: paint plants & animals, watch the ecosystem live.
 // ============================================================================
 (function () {
-  const S = G.S, F = G.F, T = G.T;
+  const S = G.S, F = G.F, T = G.T, U = G.U;
   const $ = (s) => document.querySelector(s);
   const ui = (G.ui = {
-    opts: { bars: false },
-    tool: { kind: 'unit', id: G.U.rifle },
-    brush: 26,
+    tool: { kind: 'terrain', id: T.FOREST },
+    brush: 28,
     running: false,
     speed: 1,
-    snapshot: null,
     brushPreview: null,
-    showMid: () => true,
+    selected: -1,
   });
 
   // ------------------------------------------------------------------ tabs
   const TABS = [
-    { name: 'Infanterie', items: ['rifle', 'mg', 'sniper', 'rpg', 'grenadier', 'flamer', 'medic', 'officer', 'riot', 'commando', 'sapper'] },
-    { name: 'Véhicules', items: ['jeep', 'apc', 'tank', 'artillery', 'mlrs', 'aa'] },
-    { name: 'Aérien', items: ['fpv', 'bomber', 'heli', 'jet'] },
-    { name: 'Bâtiments', items: ['barracks', 'factory', 'helipad', 'dronebase', 'hospital', 'hq', 'bunker', 'turret', 'sam', 'mine', 'fuel'] },
-    { name: 'Terrain', terrain: ['FOREST', 'TALL', 'WATER', 'DEEP', 'MUD', 'SAND', 'ROAD', 'ROCK', 'WALL', 'PALI', 'SPIKES'], tools: ['fire', 'erase'] },
+    { name: 'Plantes', terrain: ['GRASS', 'TALL', 'FLOWERS', 'BUSH', 'FOREST', 'REEDS'], items: ['hive'] },
+    { name: 'Herbivores', items: ['rabbit', 'mouse', 'squirrel', 'deer', 'boar', 'bison', 'beaver'] },
+    { name: 'Prédateurs', items: ['fox', 'wolf', 'lynx', 'bear'] },
+    { name: 'Oiseaux', items: ['eagle', 'owl', 'vulture', 'crow', 'duck', 'heron'] },
+    { name: 'Eau & insectes', terrain: ['WATER', 'DEEP'], items: ['fish', 'frog', 'butterfly'] },
+    { name: 'Terrain', terrain: ['SAND', 'MUD', 'ROCK', 'DIRT'] },
+    { name: 'Outils', tools: ['inspect', 'rain', 'fire', 'erase'] },
   ];
-  const TOOLS = { erase: 'Gomme', fire: 'Feu' };
+  const TOOLS = { inspect: ['Loupe', '🔍'], rain: ['Faire pleuvoir', '🌧️'], fire: ['Foudre', '⚡'], erase: ['Gomme', '🧽'] };
   let curTab = 0;
 
   const iconCache = {};
-  function unitIcon(id, team) {
-    const key = id + ':' + team;
-    if (!iconCache[key]) iconCache[key] = G.frameIcon(G.unitFrames[id * 3], 96, G.TEAM_RGB[team]);
-    return iconCache[key];
+  function unitIcon(id) {
+    if (!iconCache[id]) iconCache[id] = G.frameIcon(G.unitFramesM[id * 4], 96, [255, 255, 255]);
+    return iconCache[id];
   }
+  ui.unitIcon = unitIcon;
   function terrainIcon(k) {
     const c = document.createElement('canvas');
     c.width = c.height = 96;
     const x = c.getContext('2d');
-    const col = G.TERRAIN[T[k]].col;
-    x.fillStyle = `rgb(${col})`; x.strokeStyle = '#2b2433'; x.lineWidth = 5;
+    const t = G.TERRAIN[T[k]];
+    x.fillStyle = `rgb(${t.lush})`; x.strokeStyle = '#2b2433'; x.lineWidth = 5;
     x.beginPath(); x.roundRect(14, 14, 68, 68, 20); x.fill(); x.stroke();
-    const fr = { FOREST: 'tree0', ROCK: 'rock0', WALL: 'wall', PALI: 'pali', SPIKES: 'spikes' }[k];
+    const fr = { FOREST: ['tree0', 54], BUSH: ['bushB', 46], FLOWERS: ['flower0', 30], TALL: ['tuft', 40], REEDS: ['reed', 46], ROCK: ['rock0', 50] }[k];
+    const draw = (name, size, dx, dy) => { const f = G.frames[G.FR[name]]; const s = Math.min(size / f.w, size / f.h); x.drawImage(G.atlasBase, f.x, f.y, f.w, f.h, dx - f.w * s / 2, dy - f.h * s / 2, f.w * s, f.h * s); };
     if (fr) {
-      const f = G.frames[G.FR[fr]];
-      const s = Math.min(54 / f.w, 54 / f.h);
-      x.drawImage(G.atlasBase, f.x, f.y, f.w, f.h, 48 - f.w * s / 2, 50 - f.h * s / 2, f.w * s, f.h * s);
+      if (k === 'FLOWERS') { draw('flower0', 26, 36, 42); draw('flower1', 26, 58, 52); draw('flower3', 24, 44, 62); }
+      else draw(fr[0], fr[1], 48, 50);
     }
     if (k === 'WATER' || k === 'DEEP') { x.strokeStyle = 'rgba(255,255,255,.8)'; x.lineWidth = 5; x.beginPath(); x.moveTo(28, 50); x.quadraticCurveTo(38, 42, 48, 50); x.quadraticCurveTo(58, 58, 68, 50); x.stroke(); }
     return c.toDataURL();
   }
-  function toolIcon(k) {
+  function emojiIcon(e) {
     const c = document.createElement('canvas');
     c.width = c.height = 96;
     const x = c.getContext('2d');
     x.font = '56px system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.fillText(k === 'fire' ? '🔥' : '🧽', 48, 54);
+    x.fillText(e, 48, 54);
     return c.toDataURL();
   }
 
@@ -64,8 +63,8 @@
     nameEl.textContent = txt;
     const r = el.getBoundingClientRect();
     nameEl.classList.add('show');
-    nameEl.style.left = Math.max(4, r.left + r.width / 2 - nameEl.offsetWidth / 2) + 'px';
-    nameEl.style.top = r.top - 34 + 'px';
+    nameEl.style.left = Math.max(4, Math.min(innerWidth - nameEl.offsetWidth - 4, r.left + r.width / 2 - nameEl.offsetWidth / 2)) + 'px';
+    nameEl.style.top = r.top - nameEl.offsetHeight - 8 + 'px';
   }
   function hideName() { nameEl.classList.remove('show'); }
 
@@ -84,97 +83,66 @@
     const row = $('#tools');
     row.innerHTML = '';
     const tab = TABS[curTab];
-    const add = (label, icon, active, onclick) => {
+    const add = (label, desc, icon, active, onclick) => {
       const b = document.createElement('button');
       b.className = 'tool' + (active ? ' on' : '');
       b.setAttribute('aria-label', label);
       b.innerHTML = `<img src="${icon}" alt="">`;
       b.onclick = () => { onclick(); renderTools(); };
-      b.onmouseenter = () => showName(label, b);
+      b.onmouseenter = () => showName(desc ? `${label} — ${desc}` : label, b);
       b.onmouseleave = hideName;
       row.appendChild(b);
     };
-    for (const k of tab.items || []) {
-      const id = G.U[k], u = G.UNITS[id];
-      add(u.name, unitIcon(id, u.flags & F.NEUTRAL ? 4 : 1), ui.tool.kind === 'unit' && ui.tool.id === id, () => (ui.tool = { kind: 'unit', id }));
-    }
     for (const k of tab.terrain || []) {
       const tt = T[k];
-      add(G.TERRAIN[tt].name, terrainIcon(k), ui.tool.kind === 'terrain' && ui.tool.id === tt, () => (ui.tool = { kind: 'terrain', id: tt }));
+      add(G.TERRAIN[tt].name, G.TERRAIN[tt].desc, terrainIcon(k), ui.tool.kind === 'terrain' && ui.tool.id === tt, () => (ui.tool = { kind: 'terrain', id: tt }));
     }
-    for (const k of tab.tools || []) add(TOOLS[k], toolIcon(k), ui.tool.kind === k, () => (ui.tool = { kind: k }));
+    for (const k of tab.items || []) {
+      const id = U[k], u = G.UNITS[id];
+      add(u.name, u.desc, unitIcon(id), ui.tool.kind === 'unit' && ui.tool.id === id, () => (ui.tool = { kind: 'unit', id }));
+    }
+    for (const k of tab.tools || []) add(TOOLS[k][0], '', emojiIcon(TOOLS[k][1]), ui.tool.kind === k, () => {
+      if (k === 'rain') { S.makeRain(); toast(S.season() === 3 ? '❄️ Il neige…' : '🌧️ Il pleut : l\'herbe pousse deux fois plus vite.'); return; }
+      ui.tool = { kind: k };
+    });
   }
 
-  // ------------------------------------------------------------------ camera: the whole field always fits the screen
+  // ------------------------------------------------------------------ camera
   const cv = $('#gl');
   ui.worldForScreen = function () {
     const w = cv.clientWidth || innerWidth, h = cv.clientHeight || innerHeight;
-    const z = Math.max(0.75, Math.min(1.7, w / 1100));
-    return [Math.round(w / z / 8) * 8, Math.round(h / z / 8) * 8];
+    const z = Math.max(0.9, Math.min(2, w / 900));
+    return [Math.round(w / z / 16) * 16, Math.round(h / z / 16) * 16];
   };
   ui.fitCamera = function () {
     const w = cv.clientWidth, h = cv.clientHeight;
     const z = Math.min(w / S.W, h / S.H);
-    G.cam.zoom = z;
-    G.cam.x = S.W / 2 - w / z / 2;
-    G.cam.y = S.H / 2 - h / z / 2;
+    G.cam.zoom = z; G.cam.x = S.W / 2 - w / z / 2; G.cam.y = S.H / 2 - h / z / 2;
   };
   window.addEventListener('resize', () => ui.fitCamera());
   const toWorld = (sx, sy) => [G.cam.x + sx / G.cam.zoom, G.cam.y + sy / G.cam.zoom];
 
   // ------------------------------------------------------------------ painting
-  let occ = null, OW = 0, OH = 0;
-  const OC = 4;
-  function buildOcc() {
-    OW = Math.ceil(S.W / OC); OH = Math.ceil(S.H / OC);
-    if (!occ || occ.length !== OW * OH) occ = new Uint8Array(OW * OH); else occ.fill(0);
-    for (let i = 0; i < S.hw; i++) if (S.alive[i]) markOcc(S.x[i], S.y[i], G.UR[S.type[i]]);
-  }
-  function cells(x, y, r, fn) {
-    const x0 = Math.max(0, ((x - r) / OC) | 0), x1 = Math.min(OW - 1, ((x + r) / OC) | 0);
-    const y0 = Math.max(0, ((y - r) / OC) | 0), y1 = Math.min(OH - 1, ((y + r) / OC) | 0);
-    for (let yy = y0; yy <= y1; yy++) for (let xx = x0; xx <= x1; xx++) {
-      const cx = xx * OC + 2 - x, cy = yy * OC + 2 - y;
-      if (cx * cx + cy * cy <= r * r && fn(yy * OW + xx) === false) return false;
-    }
-    return true;
-  }
-  const markOcc = (x, y, r) => cells(x, y, r, (k) => { occ[k] = 1; });
-  const freeOcc = (x, y, r) => cells(x, y, r, (k) => (occ[k] ? false : undefined));
-  const teamFor = (x) => (x < S.W / 2 ? 0 : 1);
-
-  let lastBuild = null;
+  let lastSpawn = 0;
   function stamp(wx, wy, first) {
     const tool = ui.tool, rb = ui.brush;
-    if (tool.kind === 'unit') {
-      const t = tool.id, u = G.UNITS[t], r = G.UR[t];
-      if (u.cat === 'build' && !(u.flags & (F.NEUTRAL | F.MINE))) {
-        if (!first && lastBuild && Math.hypot(wx - lastBuild[0], wy - lastBuild[1]) < r * 2 + 6) return;
-        if (!freeOcc(wx, wy, r + 2) || S.blockedAt(wx, wy)) return;
-        S.spawn(t, teamFor(wx), wx, wy);
-        markOcc(wx, wy, r + 2);
-        lastBuild = [wx, wy];
-        return;
-      }
-      const sp = r * 2 * (u.flags & F.NEUTRAL ? 3 : u.flags & F.MINE ? 4 : u.flags & F.AIR ? 1.5 : 1.06);
-      const rowH = sp * 0.866;
-      for (let row = Math.floor((wy - rb) / rowH); row <= Math.ceil((wy + rb) / rowH); row++) {
-        const yy = row * rowH, off = row & 1 ? sp / 2 : 0;
-        for (let col = Math.floor((wx - rb - off) / sp); col <= Math.ceil((wx + rb - off) / sp); col++) {
-          const xx = col * sp + off;
-          if ((xx - wx) ** 2 + (yy - wy) ** 2 > rb * rb) continue;
-          if (xx < 3 || yy < 3 || xx > S.W - 3 || yy > S.H - 3) continue;
-          if (!freeOcc(xx, yy, r * 0.95) || (!(u.flags & F.AIR) && S.blockedAt(xx, yy))) continue;
-          if (S.spawn(t, teamFor(xx), xx, yy) < 0) return;
-          markOcc(xx, yy, r * 0.95);
-        }
-      }
-    } else if (tool.kind === 'terrain') {
-      let r = rb;
-      if (tool.id === T.WALL || tool.id === T.PALI) r = Math.max(7, Math.min(rb, 20));
-      S.paintTerrain(wx, wy, r, tool.id);
-    } else if (tool.kind === 'erase') { S.eraseAt(wx, wy, rb); S.paintTerrain(wx, wy, rb, T.GRASS); buildOcc(); }
-    else if (tool.kind === 'fire') S.igniteAt(wx, wy, rb);
+    if (tool.kind === 'terrain') { S.paintTerrain(wx, wy, rb, tool.id); return; }
+    if (tool.kind === 'erase') { S.eraseAt(wx, wy, rb); S.paintTerrain(wx, wy, rb, T.GRASS); return; }
+    if (tool.kind === 'fire') { S.igniteAt(wx, wy, Math.min(rb, 16)); G.fx.sparkle(wx, wy, 6); return; }
+    if (tool.kind === 'inspect') { if (first) { ui.selected = S.pick(wx, wy); renderCard(); } return; }
+    if (tool.kind !== 'unit') return;
+    const t = tool.id, u = G.UNITS[t];
+    if (u.flags & F.HIVE) { if (first && S.okAt(t, wx, wy)) S.spawn(t, wx, wy); return; }
+    // scatter a few individuals in the brush (animals are not soldiers in rows)
+    const now = performance.now();
+    if (!first && now - lastSpawn < 70) return;
+    lastSpawn = now;
+    const n = Math.max(1, Math.round(rb * rb / (u.r * u.r * 60)));
+    for (let k = 0; k < Math.min(n, 12); k++) {
+      const a = Math.random() * 6.283, d = Math.sqrt(Math.random()) * rb;
+      const x = wx + Math.cos(a) * d, y = wy + Math.sin(a) * d;
+      if (S.okAt(t, x, y)) S.spawn(t, x, y);
+    }
   }
   let lastPaint = null;
   function strokeTo(wx, wy) {
@@ -184,11 +152,10 @@
     lastPaint = [wx, wy];
   }
 
-  // ------------------------------------------------------------------ input
   let painting = false, pinch = null;
   const pointers = new Map();
   let mouse = [0, 0, false];
-  const setBrush = (v) => { ui.brush = Math.max(4, Math.min(220, v)); };
+  const setBrush = (v) => { ui.brush = Math.max(4, Math.min(160, v)); };
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
   cv.addEventListener('pointerdown', (e) => {
     cv.setPointerCapture(e.pointerId);
@@ -202,9 +169,8 @@
     }
     if (e.button !== 0) return;
     painting = true;
-    buildOcc();
     const [wx, wy] = toWorld(e.offsetX, e.offsetY);
-    lastPaint = [wx, wy]; lastBuild = null;
+    lastPaint = [wx, wy];
     stamp(wx, wy, true);
   });
   cv.addEventListener('pointermove', (e) => {
@@ -227,118 +193,161 @@
   cv.addEventListener('pointerleave', () => { if (!painting) mouse[2] = false; });
   cv.addEventListener('wheel', (e) => { e.preventDefault(); setBrush(ui.brush * Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
 
+  // ------------------------------------------------------------------ play / speed
+  function setRunning(r) { ui.running = r; update(); }
+  function update() {
+    const b = $('#start');
+    b.textContent = ui.running ? '❚❚ Pause' : '▶ Lancer la vie';
+    b.classList.toggle('pause', ui.running);
+    document.querySelectorAll('#speed button').forEach((o) => o.classList.toggle('on', +o.dataset.s === ui.speed));
+  }
+  $('#start').onclick = () => setRunning(!ui.running);
+  document.querySelectorAll('#speed button').forEach((b) => (b.onclick = () => { ui.speed = +b.dataset.s; if (!ui.running) ui.running = true; update(); }));
+  $('#clear').onclick = () => {
+    const [w, h] = ui.worldForScreen();
+    if (w !== S.W || h !== S.H) { G.initWorld(w, h); G.R.initWorld(); ui.fitCamera(); } else S.clearAll();
+    G.R.clearDecals(); ui.selected = -1; renderCard(); setRunning(false);
+  };
+  $('#demo').onclick = () => { G.demo(); setRunning(true); };
+
+  // ------------------------------------------------------------------ toasts
+  const queue = [];
+  let toastBusy = false;
+  function toast(msg) { queue.push(msg); if (!toastBusy) nextToast(); }
+  ui.toast = toast;
+  function nextToast() {
+    const t = $('#toast');
+    if (!queue.length) { toastBusy = false; t.classList.remove('show'); return; }
+    toastBusy = true;
+    t.textContent = queue.shift();
+    t.classList.add('show');
+    setTimeout(() => { t.classList.remove('show'); setTimeout(nextToast, 350); }, 3800);
+  }
+
+  // ------------------------------------------------------------------ inspector card
+  const STATE_ICON = ['🚶', '🌿', '👀', '💧', '💨', '🎯', '🍖', '💕', '💤', '🐾', '⚔️', '🔨', '🏠', '🫣'];
+  function nameOf(i) {
+    const k = G.UNITS[S.type[i]].k;
+    if (S.nameI[i] % 9 === 0 && G.SPECIAL_NAMES[k]) return G.SPECIAL_NAMES[k];
+    return G.NAMES[S.nameI[i] % G.NAMES.length];
+  }
+  function renderCard() {
+    const c = $('#card');
+    const i = ui.selected;
+    if (i < 0 || !S.alive[i]) { c.classList.remove('show'); ui.selected = -1; return; }
+    const t = S.type[i], u = G.UNITS[t];
+    let h = `<div class="ch"><img src="${unitIcon(t)}" alt=""><div><b>${u.flags & F.CARCASS ? 'Carcasse' : nameOf(i)}</b><small>${u.name}${u.flags & (F.STATIC) ? '' : S.sex[i] ? ' ♂' : ' ♀'}${S.vari[i] === 1 ? ' · doré ✨' : S.vari[i] === 2 ? ' · albinos' : ''}</small></div><button id="cardX" aria-label="Fermer">✕</button></div>`;
+    if (u.flags & F.CARCASS) h += `<p>Nourriture restante : ${(S.store[i]).toFixed(1)}. Elle nourrit charognards et prédateurs puis fertilise le sol.</p>`;
+    else if (u.flags & F.HIVE) h += `<p>Miel : ${S.store[i].toFixed(1)}</p>`;
+    else {
+      const age = S.age[i];
+      h += `<p class="st">${STATE_ICON[S.state[i]]} ${S.STATE_NAMES[S.state[i]]}${S.preg[i] > 0 ? ' · attend des petits' : ''}</p>`;
+      const bar = (lbl, v, col) => `<div class="bar"><span>${lbl}</span><i><em style="width:${Math.max(0, Math.min(100, v * 100))}%;background:${col}"></em></i></div>`;
+      h += bar('Énergie', S.en[i], '#5cb85c');
+      if (u.thirst < 50) h += bar('Hydratation', S.wat[i], '#4aa8e8');
+      h += bar('Santé', S.hp[i] / G.UHP[t], '#e8584a');
+      h += `<div class="kv">Âge <b>${age.toFixed(1)} j</b> <span>· adulte à ${u.mature} j · vit ~${u.life} j</span></div>`;
+      if (S.kids[i]) h += `<div class="kv">Petits <b>${S.kids[i]}</b></div>`;
+      if (S.kills[i]) h += `<div class="kv">Proies <b>${S.kills[i]}</b></div>`;
+      h += `<p class="d">${u.desc}</p>`;
+      if (t === U.frog) h += '<button id="kiss">💋 Embrasser</button>';
+    }
+    c.innerHTML = h;
+    c.classList.add('show');
+    $('#cardX').onclick = () => { ui.selected = -1; renderCard(); };
+    const k = $('#kiss');
+    if (k) k.onclick = () => {
+      if (Math.random() < 0.08) { G.fx.sparkle(S.x[i], S.y[i] - 4, 20); S.remove(i); toast('✨ C\'était un vrai prince ! Il repart vers son château.'); ui.selected = -1; renderCard(); }
+      else toast('🐸 Il ne se passe rien. C\'était juste une grenouille.');
+    };
+  }
+
+  // ------------------------------------------------------------------ population graph
+  const GRAPH_SP = ['rabbit', 'mouse', 'squirrel', 'deer', 'boar', 'bison', 'beaver', 'fox', 'wolf', 'lynx', 'bear', 'eagle', 'owl', 'vulture', 'crow', 'duck', 'heron', 'fish', 'frog', 'bee', 'butterfly'];
+  const GRAPH_COL = ['#c49a78', '#9d9aa4', '#c9692e', '#a8643a', '#5a4434', '#3a271b', '#8a5a34', '#e0702a', '#6a6c74', '#c9a46a', '#7a4c2c', '#d4a020', '#b8966e', '#4a4240', '#2c2a34', '#2f7a4a', '#7a8ea8', '#f0a868', '#5cae4a', '#f5c518', '#ff8a3d'];
+  const hidden = new Set(['bee', 'butterfly', 'mouse', 'frog']);
+  function drawGraph() {
+    const cvs = $('#graphCv'), ctx = cvs.getContext('2d');
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    const W = cvs.clientWidth, H = cvs.clientHeight;
+    cvs.width = W * dpr; cvs.height = H * dpr; ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+    const hist = S.hist;
+    const pad = { l: 36, r: 10, t: 10, b: 22 };
+    const shown = GRAPH_SP.filter((k) => !hidden.has(k) && hist.some((h) => h.c[U[k]] > 0));
+    let max = 5;
+    for (const h of hist) for (const k of shown) max = Math.max(max, h.c[U[k]]);
+    const t0 = hist.length ? hist[0].t : 0, t1 = hist.length ? Math.max(hist[hist.length - 1].t, t0 + 1) : 1;
+    const X = (t) => pad.l + (t - t0) / (t1 - t0) * (W - pad.l - pad.r), Y = (v) => H - pad.b - v / max * (H - pad.t - pad.b);
+    ctx.strokeStyle = '#ebe9ef'; ctx.fillStyle = '#8a8494'; ctx.font = '11px system-ui'; ctx.lineWidth = 1;
+    for (let k = 0; k <= 4; k++) { const v = Math.round(max * k / 4), y = Y(v); ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke(); ctx.fillText(v, 4, y + 4); }
+    ctx.fillText(`jour ${Math.floor(t0)}`, pad.l, H - 6); ctx.textAlign = 'right'; ctx.fillText(`jour ${Math.floor(t1)}`, W - pad.r, H - 6); ctx.textAlign = 'left';
+    ctx.lineWidth = 2;
+    for (const k of shown) {
+      ctx.strokeStyle = GRAPH_COL[GRAPH_SP.indexOf(k)];
+      ctx.beginPath();
+      hist.forEach((h, n) => { const x = X(h.t), y = Y(h.c[U[k]]); n ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+      ctx.stroke();
+    }
+    const leg = $('#legend');
+    leg.innerHTML = '';
+    for (const k of GRAPH_SP) {
+      const n = S.counts[U[k]];
+      if (!n && !hist.some((h) => h.c[U[k]] > 0)) continue;
+      const b = document.createElement('button');
+      b.className = 'lg' + (hidden.has(k) ? ' off' : '');
+      b.innerHTML = `<i style="background:${GRAPH_COL[GRAPH_SP.indexOf(k)]}"></i>${G.UNITS[U[k]].name} <b>${n}</b>`;
+      b.onclick = () => { hidden.has(k) ? hidden.delete(k) : hidden.add(k); drawGraph(); };
+      leg.appendChild(b);
+    }
+  }
+  $('#graphBtn').onclick = () => { $('#graph').classList.add('show'); drawGraph(); };
+  $('#graph').addEventListener('click', (e) => { if (e.target.id === 'graph' || e.target.id === 'graphX') $('#graph').classList.remove('show'); });
+
+  // ------------------------------------------------------------------ secret words
+  let typed = '';
+  const KONAMI = 'ArrowUpArrowUpArrowDownArrowDownArrowLeftArrowRightArrowLeftArrowRightba';
+  let konami = '';
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.code === 'Space') { e.preventDefault(); if (!e.repeat) (S.phase === 'deploy' ? start() : e.code === 'Space' ? (ui.running = !ui.running) : reset()); }
-    else if (e.key === 'c' || e.key === 'C') clearAll();
-    else if (e.key === '[') setBrush(ui.brush / 1.25);
-    else if (e.key === ']') setBrush(ui.brush * 1.25);
+    if (e.code === 'Space') { e.preventDefault(); setRunning(!ui.running); return; }
+    konami = (konami + e.key).slice(-KONAMI.length);
+    if (konami === KONAMI) { S.discoTime(); toast('🕺 Mode disco : tout le monde danse !'); konami = ''; }
+    if (e.key.length !== 1) return;
+    typed = (typed + e.key.toLowerCase()).slice(-12);
+    const secret = (w, fn) => { if (typed.endsWith(w)) { typed = ''; fn(); } };
+    secret('nessie', () => { if (S.spawnSecret('nessie', '🦕 Quelque chose remue dans les profondeurs du lac…') < 0) toast('🦕 Il faudrait un lac profond pour ça…'); });
+    secret('dodo', () => { if (S.spawnSecret('dodo', '🦤 Un dodo ! Éteint depuis 1681… Protégez-le des renards.') >= 0) S.spawnSecret('dodo', ''); });
+    secret('bigfoot', () => { if (S.spawnSecret('bigfoot', '👣 Tu l\'as appelé…') < 0) toast('👣 Bigfoot ne sort que des forêts.'); });
+    secret('licorne', () => S.spawnSecret('unicorn', '🦄 Tu y crois vraiment ? Bon, d\'accord.'));
+    secret('lune', () => { S.time = Math.floor(S.time / G.DAY / 8) * 8 * G.DAY + 4.95 * G.DAY; toast('🌕 Avance rapide jusqu\'à la pleine lune.'); });
   });
 
-  // ------------------------------------------------------------------ battle flow
-  function start() {
-    if (S.count === 0) return;
-    ui.snapshot = S.snapshot();
-    S.startBattle();
-    ui.running = true;
-    update();
-  }
-  function reset() {
-    if (ui.snapshot) S.restore(ui.snapshot);
-    G.R.clearDecals();
-    ui.running = false;
-    update();
-  }
-  function clearAll() {
-    const [w, h] = ui.worldForScreen();
-    if (w !== S.W || h !== S.H) { G.initWorld(w, h); G.R.initWorld(); ui.fitCamera(); }
-    else S.clearAll();
-    G.R.clearDecals();
-    ui.snapshot = null; ui.running = false;
-    update();
-  }
-  ui.clearAll = clearAll;
-  function update() {
-    const battle = S.phase === 'battle';
-    document.body.classList.toggle('battle', battle);
-    const b = $('#start');
-    b.textContent = battle ? 'Rejouer' : 'Lancer';
-    b.classList.toggle('reset', battle);
-    $('#end').classList.remove('show');
-    $('#stats').classList.remove('show');
-    endShown = false;
-  }
-  $('#start').onclick = () => (S.phase === 'deploy' ? start() : reset());
-  $('#clear').onclick = clearAll;
-
-  // ------------------------------------------------------------------ end of battle & stats
-  let endShown = false;
-  function showEnd() {
-    endShown = true;
-    const w = S.winner;
-    const t = $('#endTxt');
-    t.textContent = w >= 0 ? `Victoire ${['rouge', 'bleue', 'verte', 'jaune'][w]} !` : 'Égalité !';
-    t.style.color = w >= 0 ? `rgb(${G.TEAM_RGB[w]})` : '';
-    $('#end').classList.add('show');
-  }
-  $('#seeStats').onclick = () => { renderStats(); $('#stats').classList.add('show'); };
-  $('#stats').addEventListener('click', (e) => { if (e.target.id === 'stats' || e.target.id === 'close') $('#stats').classList.remove('show'); });
-
-  function renderStats() {
-    const st = S.stat, NU = G.UNITS.length;
-    const teams = [0, 1, 2, 3].filter((k) => { for (let t = 0; t < NU; t++) if (st.deployed[t * 4 + k]) return true; return false; });
-    const tName = (k) => ['Rouges', 'Bleus', 'Verts', 'Jaunes'][k];
-    const secs = Math.round(S.time);
-    let h = `<h2 style="color:${S.winner >= 0 ? `rgb(${G.TEAM_RGB[S.winner]})` : 'inherit'}">${$('#endTxt').textContent}</h2>`;
-    h += `<div class="sub">Combat de ${Math.floor(secs / 60)} min ${secs % 60} s</div><div class="cols">`;
-    for (const k of teams) {
-      let dep = 0, lost = 0, kills = 0, best = -1, bestK = 0;
-      for (let t = 0; t < NU; t++) {
-        dep += st.deployed[t * 4 + k]; lost += st.lost[t * 4 + k]; kills += st.kills[t * 4 + k];
-        if (st.kills[t * 4 + k] > bestK) { bestK = st.kills[t * 4 + k]; best = t; }
-      }
-      h += `<div class="side"><h3 style="color:rgb(${G.TEAM_RGB[k]})">${tName(k)}</h3>`;
-      h += `<div class="kv">Engagés<b>${dep.toLocaleString('fr-FR')}</b></div>`;
-      h += `<div class="kv">Survivants<b>${S.teamCount[k].toLocaleString('fr-FR')}</b></div>`;
-      h += `<div class="kv">Pertes<b>${lost.toLocaleString('fr-FR')}</b></div>`;
-      h += `<div class="kv">Éliminations<b>${kills.toLocaleString('fr-FR')}</b></div>`;
-      if (best >= 0) h += `<div class="mvp"><img src="${unitIcon(best, k)}" alt=""><div><small>Meilleure unité</small>${G.UNITS[best].name} · ${bestK} élim.</div></div>`;
-      h += '</div>';
-    }
-    h += '</div>';
-    // per unit-type table (two main teams)
-    const a = teams[0], b = teams[1];
-    const rows = [];
-    for (let t = 0; t < NU; t++) {
-      const anyA = a != null && st.deployed[t * 4 + a], anyB = b != null && st.deployed[t * 4 + b];
-      if (anyA || anyB) rows.push(t);
-    }
-    rows.sort((p, q) => (st.kills[q * 4 + a] + (b != null ? st.kills[q * 4 + b] : 0)) - (st.kills[p * 4 + a] + (b != null ? st.kills[p * 4 + b] : 0)));
-    h += `<table><tr><th>Unité</th><th class="r">Engagés</th><th class="r">Pertes</th><th class="r">Élim.</th>${b != null ? '<th class="b">Engagés</th><th class="b">Pertes</th><th class="b">Élim.</th>' : ''}</tr>`;
-    for (const t of rows) {
-      const c = (k, f) => (k == null ? '' : `<td>${st[f][t * 4 + k] || '–'}</td>`);
-      h += `<tr><td><img src="${unitIcon(t, 1)}" alt="">${G.UNITS[t].name}</td>${c(a, 'deployed')}${c(a, 'lost')}${c(a, 'kills')}${b != null ? c(b, 'deployed') + c(b, 'lost') + c(b, 'kills') : ''}</tr>`;
-    }
-    h += '</table><button id="close">Fermer</button>';
-    $('#card').innerHTML = h;
-  }
-
   // ------------------------------------------------------------------ per frame
-  ui.update = function () {
-    if (mouse[2]) {
+  let lastCard = 0;
+  const SEASONS = ['Printemps', 'Été', 'Automne', 'Hiver'];
+  const SEASON_ICON = ['🌸', '☀️', '🍂', '❄️'];
+  ui.update = function (now) {
+    if (mouse[2] && ui.tool.kind !== 'inspect') {
       const [wx, wy] = toWorld(mouse[0], mouse[1]);
       let r = ui.brush;
-      const tool = ui.tool;
-      const u = tool.kind === 'unit' ? G.UNITS[tool.id] : null;
-      if (u && u.cat === 'build' && !(u.flags & (F.NEUTRAL | F.MINE))) r = G.UR[tool.id];
-      if (tool.kind === 'terrain' && (tool.id === T.WALL || tool.id === T.PALI)) r = Math.max(7, Math.min(r, 20));
-      const c = u ? G.TEAM_RGB[u.flags & F.NEUTRAL ? 4 : teamFor(wx)] : tool.kind === 'fire' ? [255, 120, 30] : [43, 36, 51];
-      ui.brushPreview = { x: wx, y: wy, r, col: G.R.rgba(c[0], c[1], c[2], 255) };
+      if (ui.tool.kind === 'unit' && G.UNITS[ui.tool.id].flags & F.HIVE) r = 5;
+      if (ui.tool.kind === 'fire') r = Math.min(r, 16);
+      ui.brushPreview = { x: wx, y: wy, r, col: 0xff302830 };
     } else ui.brushPreview = null;
-    S.events.length = 0;
-    if (S.phase === 'battle' && S.winner !== -2 && !endShown) showEnd();
+    for (const m of S.events.splice(0)) if (m) toast(m);
+    if (now - lastCard > 300) {
+      lastCard = now;
+      if (ui.selected >= 0) renderCard();
+      const day = S.time / G.DAY, h = S.hour(), se = S.season();
+      const hh = Math.floor(h), mm = Math.floor((h - hh) * 60 / 15) * 15;
+      const wx = S.rain > 0.3 ? (S.weather === 'snow' ? '🌨️' : S.weather === 'storm' ? '⛈️' : '🌧️') : S.isNight() ? '🌙' : '☀️';
+      $('#clock').innerHTML = `<b>Jour ${Math.floor(day) + 1}</b> · ${SEASON_ICON[se]} ${SEASONS[se]} · ${wx} ${String(hh).padStart(2, '0')}h${String(mm).padStart(2, '0')}`;
+      let n = 0; for (let t = 0; t < G.NSP; t++) if (!(G.UFL[t] & F.STATIC)) n += S.counts[t];
+      $('#pop').textContent = `${n.toLocaleString('fr-FR')} animaux`;
+      if ($('#graph').classList.contains('show')) drawGraph();
+    }
+    $('#rainbow').style.opacity = Math.max(0, Math.min(1, S.rainbow)) * 0.55;
   };
 
-  ui.init = function () {
-    renderTabs(); renderTools(); update();
-  };
+  ui.init = function () { renderTabs(); renderTools(); update(); };
 })();

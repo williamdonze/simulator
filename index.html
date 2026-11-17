@@ -3,29 +3,34 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Armées Peintes</title>
-<meta name="description" content="Peins des armées et regarde-les s'affronter.">
+<title>Petit Monde</title>
+<meta name="description" content="Peins des forêts, des lacs et des animaux, et regarde un écosystème vivant évoluer.">
 <style>
   :root {
-    --bg: #f6f6f0; --panel: #ffffff; --ink: #2b2433; --muted: #8a8494; --line: #ebe9ef;
-    --red: #de3a34; --blue: #3470f0; --go: #2fb24c; --go-d: #23893a; --shadow: 0 2px 0 rgba(43,36,51,.12), 0 6px 18px rgba(43,36,51,.1);
+    --bg: #eef2e4; --panel: #ffffff; --ink: #2b2433; --muted: #8a8494; --line: #ebe9ef;
+    --go: #3aa655; --go-d: #2a7f3f; --shadow: 0 2px 0 rgba(43,36,51,.12), 0 6px 18px rgba(43,36,51,.1);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
     font: 600 14px/1.3 ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-user-select: none; user-select: none; }
-  #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: none; }
+  #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
   button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+  .panel { background: var(--panel); border-radius: 16px; box-shadow: var(--shadow); }
 
-  #logo { position: fixed; top: max(14px, env(safe-area-inset-top)); left: 18px; font-size: 22px; font-weight: 900; letter-spacing: -0.5px; pointer-events: none; }
-  #logo b { color: var(--red); } #logo i { font-style: normal; color: var(--blue); }
+  #logo { position: fixed; top: max(14px, env(safe-area-inset-top)); left: 18px; font-size: 22px; font-weight: 900; letter-spacing: -0.5px; pointer-events: none; color: #2f6b3a; text-shadow: 0 2px 0 #fff, 0 0 8px #fff; }
+  #logo span { color: #e0702a; }
 
-  #labels { position: fixed; top: max(16px, env(safe-area-inset-top)); left: 0; right: 0; display: flex; pointer-events: none; transition: opacity .3s; }
-  #labels span { flex: 1; text-align: center; font-weight: 800; font-size: 15px; }
-  #labels .l { color: var(--red); } #labels .r { color: var(--blue); }
-  .battle #labels { opacity: 0; }
+  #hud { position: fixed; top: max(12px, env(safe-area-inset-top)); right: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  #clock { font-size: 13px; white-space: nowrap; }
+  #clock b { font-weight: 900; }
+  #hudrow { display: flex; gap: 8px; align-items: center; }
+  #pop { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  #speed { display: flex; background: var(--line); border-radius: 10px; padding: 2px; }
+  #speed button { padding: 3px 8px; border-radius: 8px; font-size: 12px; color: var(--muted); }
+  #speed button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+  #graphBtn { padding: 3px 8px; border-radius: 8px; background: var(--line); font-size: 12px; }
 
-  /* toolbar */
-  #bar { position: fixed; left: 16px; bottom: max(16px, env(safe-area-inset-bottom)); max-width: calc(100vw - 210px); }
+  #bar { position: fixed; left: 16px; bottom: max(16px, env(safe-area-inset-bottom)); max-width: calc(100vw - 240px); }
   #tabs { display: flex; gap: 2px; padding-left: 10px; overflow-x: auto; scrollbar-width: none; }
   #tabs::-webkit-scrollbar { display: none; }
   .tab { padding: 7px 12px 6px; border-radius: 12px 12px 0 0; color: var(--muted); white-space: nowrap; font-size: 13px; }
@@ -35,78 +40,91 @@
   .tool { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; position: relative; }
   .tool img { width: 46px; height: 46px; pointer-events: none; transition: transform .12s; }
   .tool:hover img { transform: scale(1.12); }
-  .tool.on { background: #efedf3; }
+  .tool.on { background: #eef0e8; }
   .tool.on::after { content: ""; position: absolute; inset: 0; border-radius: 12px; box-shadow: inset 0 0 0 2.5px var(--ink); }
-
-  #name { position: fixed; pointer-events: none; padding: 4px 9px; border-radius: 8px; background: var(--ink); color: #fff; font-size: 12px; opacity: 0; transition: opacity .12s; white-space: nowrap; z-index: 5; }
+  #name { position: fixed; pointer-events: none; padding: 6px 10px; border-radius: 10px; background: var(--ink); color: #fff; font-size: 12px; opacity: 0; transition: opacity .12s; z-index: 5; max-width: 320px; }
   #name.show { opacity: 1; }
 
-  /* right controls */
   #ctl { position: fixed; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); display: flex; align-items: flex-end; gap: 10px; }
-  .round { width: 48px; height: 48px; border-radius: 50%; background: var(--panel); box-shadow: var(--shadow); display: grid; place-items: center; }
+  .round { width: 48px; height: 48px; border-radius: 50%; background: var(--panel); box-shadow: var(--shadow); display: grid; place-items: center; font-size: 20px; }
   .round svg { width: 22px; height: 22px; stroke: var(--ink); fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-  .round:hover { transform: translateY(-1px); }
-  #start { height: 64px; min-width: 132px; padding: 0 24px; border-radius: 20px; background: var(--go); color: #fff; font-size: 21px; font-weight: 900;
-    box-shadow: 0 5px 0 var(--go-d), 0 10px 20px rgba(47,178,76,.3); transition: transform .08s, box-shadow .08s; }
+  #start { height: 60px; min-width: 150px; padding: 0 20px; border-radius: 20px; background: var(--go); color: #fff; font-size: 18px; font-weight: 900;
+    box-shadow: 0 5px 0 var(--go-d), 0 10px 20px rgba(58,166,85,.3); transition: transform .08s, box-shadow .08s; }
   #start:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--go-d); }
-  #start.reset { background: var(--ink); box-shadow: 0 5px 0 #000, 0 10px 20px rgba(0,0,0,.2); }
+  #start.pause { background: var(--ink); box-shadow: 0 5px 0 #000, 0 10px 20px rgba(0,0,0,.2); }
 
-  /* end-of-battle pill + stats */
-  #end { position: fixed; top: max(14px, env(safe-area-inset-top)); left: 50%; transform: translate(-50%, -90px); transition: transform .35s cubic-bezier(.2,1.4,.4,1);
-    background: var(--panel); border-radius: 999px; box-shadow: var(--shadow); padding: 6px 6px 6px 18px; display: flex; align-items: center; gap: 12px; font-size: 16px; font-weight: 800; white-space: nowrap; }
-  #end.show { transform: translate(-50%, 0); }
-  #end button { background: #efedf3; border-radius: 999px; padding: 8px 14px; font-size: 13px; }
-  #stats { position: fixed; inset: 0; background: rgba(43,36,51,.35); display: none; place-items: center; z-index: 10; padding: 16px; }
-  #stats.show { display: grid; }
-  #card { background: var(--panel); border-radius: 22px; box-shadow: var(--shadow); width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 20px 20px 16px; }
-  #card h2 { margin: 0 0 2px; font-size: 24px; font-weight: 900; }
-  #card .sub { color: var(--muted); margin-bottom: 14px; }
-  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .side { border-radius: 16px; padding: 12px; background: #f6f5f8; }
-  .side h3 { margin: 0 0 8px; font-size: 16px; }
-  .kv { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; padding: 2px 0; color: var(--muted); }
-  .kv b { color: var(--ink); }
-  .mvp { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 2px solid var(--line); }
-  .mvp img { width: 34px; height: 34px; }
-  .mvp small { display: block; color: var(--muted); font-size: 11px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; font-variant-numeric: tabular-nums; }
-  th { text-align: right; color: var(--muted); font-size: 11px; font-weight: 700; padding: 4px 6px; }
-  th:first-child, td:first-child { text-align: left; }
-  td { text-align: right; padding: 3px 6px; border-top: 1px solid var(--line); }
-  td img { width: 22px; height: 22px; vertical-align: middle; margin-right: 4px; }
-  .r { color: var(--red); } .b { color: var(--blue); }
-  #close { margin-top: 14px; width: 100%; padding: 11px; border-radius: 14px; background: #efedf3; }
+  #toast { position: fixed; top: max(64px, env(safe-area-inset-top)); left: 50%; transform: translate(-50%, -20px); opacity: 0; transition: .3s; padding: 10px 16px; pointer-events: none; z-index: 30; max-width: min(560px, calc(100vw - 32px)); text-align: center; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-  @media (max-width: 640px) {
+  #card { position: fixed; left: 16px; top: 60px; width: 250px; padding: 12px; display: none; z-index: 6; }
+  #card.show { display: block; }
+  .ch { display: flex; gap: 8px; align-items: center; }
+  .ch img { width: 40px; height: 40px; }
+  .ch div { flex: 1; } .ch small { display: block; color: var(--muted); font-size: 12px; }
+  #cardX { width: 26px; height: 26px; border-radius: 50%; background: var(--line); font-size: 12px; }
+  #card p { margin: 8px 0 4px; font-size: 13px; }
+  #card p.d { color: var(--muted); font-weight: 500; font-size: 12px; }
+  .bar { display: grid; grid-template-columns: 82px 1fr; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin: 3px 0; }
+  .bar i { height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .bar em { display: block; height: 100%; }
+  .kv { font-size: 12px; color: var(--muted); margin-top: 3px; } .kv b { color: var(--ink); } .kv span { font-weight: 500; }
+  #kiss { margin-top: 8px; width: 100%; padding: 8px; border-radius: 10px; background: #ffe6ee; }
+
+  #graph { position: fixed; inset: 0; background: rgba(43,36,51,.35); display: none; place-items: center; z-index: 20; padding: 16px; }
+  #graph.show { display: grid; }
+  #gcard { width: min(720px, 100%); padding: 16px; }
+  #gcard h2 { margin: 0 0 8px; font-size: 18px; display: flex; justify-content: space-between; }
+  #graphX { width: 30px; height: 30px; border-radius: 50%; background: var(--line); }
+  #graphCv { width: 100%; height: 260px; display: block; }
+  #legend { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .lg { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: var(--line); display: flex; gap: 5px; align-items: center; }
+  .lg i { width: 10px; height: 10px; border-radius: 3px; } .lg.off { opacity: .4; }
+  #gcard p { margin: 8px 0 0; color: var(--muted); font-size: 12px; font-weight: 500; }
+
+  #rainbow { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1s;
+    background: radial-gradient(circle at 70% 115%, transparent 52%, rgba(255,0,0,.5) 53%, rgba(255,150,0,.5) 55%, rgba(255,240,0,.5) 57%, rgba(0,200,60,.5) 59%, rgba(0,120,255,.5) 61%, rgba(110,0,220,.5) 63%, transparent 65%); }
+
+  @media (max-width: 680px) {
     #logo { font-size: 17px; left: 12px; }
-    #labels { top: 44px; }
-    #bar { left: 8px; right: 8px; max-width: none; bottom: calc(max(8px, env(safe-area-inset-bottom)) + 72px); }
-    #ctl { right: 8px; left: 8px; justify-content: flex-end; bottom: max(8px, env(safe-area-inset-bottom)); }
-    #start { flex: 1; height: 58px; }
+    #hud { right: 8px; padding: 6px 8px; }
+    #clock { font-size: 11px; }
+    #bar { left: 8px; right: 8px; max-width: none; bottom: calc(max(8px, env(safe-area-inset-bottom)) + 70px); }
+    #ctl { left: 8px; right: 8px; bottom: max(8px, env(safe-area-inset-bottom)); }
+    #start { flex: 1; height: 56px; }
     .tool { width: 46px; height: 46px; } .tool img { width: 40px; height: 40px; }
+    #card { top: auto; bottom: 200px; left: 8px; }
   }
 </style>
 </head>
 <body>
 <canvas id="gl"></canvas>
-<div id="logo">Armées <b>Pein</b><i>tes</i></div>
-<div id="labels"><span class="l">Équipe rouge</span><span class="r">Équipe bleue</span></div>
+<div id="rainbow"></div>
+<div id="logo">Petit <span>Monde</span></div>
+<div id="hud" class="panel">
+  <div id="clock"></div>
+  <div id="hudrow"><span id="pop"></span>
+    <div id="speed"><button data-s="1">×1</button><button data-s="4">×4</button><button data-s="16">×16</button></div>
+    <button id="graphBtn" title="Évolution des populations">📈</button></div>
+</div>
 
 <div id="bar"><div id="tabs"></div><div id="tools"></div></div>
 <div id="name"></div>
+<div id="card" class="panel"></div>
 
 <div id="ctl">
-  <button id="clear" class="round" title="Tout effacer (C)" aria-label="Tout effacer"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
-  <button id="start">Lancer</button>
+  <button id="demo" class="round" title="Charger un monde d'exemple">🌍</button>
+  <button id="clear" class="round" title="Tout effacer" aria-label="Tout effacer"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+  <button id="start">▶ Lancer la vie</button>
 </div>
 
-<div id="end"><span id="endTxt"></span><button id="seeStats">Voir les stats</button></div>
-<div id="stats"><div id="card"></div></div>
+<div id="toast" class="panel"></div>
+<div id="graph"><div id="gcard" class="panel"><h2>Populations <button id="graphX" aria-label="Fermer">✕</button></h2><canvas id="graphCv"></canvas><div id="legend"></div>
+  <p>Clique sur une espèce pour l'afficher ou la masquer. Les cycles proies / prédateurs apparaissent au bout de quelques jours (vitesse ×16 conseillée).</p></div></div>
 <div id="err" style="display:none;position:fixed;inset:30% 20px auto;padding:16px;background:#fff;color:#b00;border-radius:12px;text-align:center"></div>
 
 <script src="js/defs.js"></script>
 <script src="js/sprites.js"></script>
-<script src="js/sim.js"></script>
+<script src="js/eco.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>

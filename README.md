@@ -1,49 +1,46 @@
-# Armées Peintes
+# Petit Monde
 
-Peins des armées, des châteaux, des forêts et des rivières, puis regarde des dizaines de milliers de soldats s'affronter.
+Un bac à sable d'écosystème : peins des forêts, des prairies, des lacs, ajoute des animaux, et regarde la nature s'organiser toute seule.
 
-Ouvre simplement `index.html` dans un navigateur récent (WebGL2 requis). Aucune dépendance, aucun build.
+Ouvre `index.html` dans un navigateur récent (WebGL2). Aucune installation. Le bouton 🌍 charge une vallée d'exemple.
 
 ## Comment jouer
 
-1. Choisis une unité dans la barre du bas.
-2. Glisse sur le terrain : à gauche de la ligne pointillée tes troupes sont rouges, à droite bleues.
-3. Clique sur **Lancer**.
-4. À la fin, clique sur **Voir les stats** si tu veux le détail (pertes, éliminations, meilleure unité).
+- Choisis une plante, un terrain ou un animal dans la barre du bas et peins sur la carte.
+- **▶ Lancer la vie**, puis accélère le temps (×4, ×16) pour voir les saisons et les générations passer.
+- La molette (ou le pincement) change la taille du pinceau. `Espace` met en pause.
+- **🔍 Loupe** (onglet Outils) : clique sur un animal pour voir son nom, son âge, sa faim, sa soif, ses petits, ses proies.
+- **📈** : courbes des populations (cycles proies / prédateurs).
 
-- La molette (ou le pincement sur mobile) change la taille du pinceau. Le terrain tient toujours dans l'écran : pas de zoom.
-- **Rejouer** relance la même bataille ; la poubelle efface tout.
-- Raccourcis clavier : `Entrée` lance ou rejoue, `Espace` met en pause, `C` efface tout, `[` `]` changent la taille du pinceau.
+## Ce qui est simulé
 
-## Contenu (guerre moderne)
+- **Végétation vivante** : l'herbe repousse selon la saison et la pluie. Trop broutée, elle laisse la terre à nu, qui se recolonise ensuite. La forêt gagne lentement sur les prairies. Les écureuils oublient des noix qui deviennent des arbres. Les abeilles pollinisent et les fleurs se répandent. Après un incendie, les cendres redeviennent prairie.
+- **Besoins** : faim, soif (il faut de l'eau sur la carte), sommeil selon le rythme de l'espèce (diurne, nocturne, crépusculaire), vieillissement, mort.
+- **Reproduction** : mâles et femelles, gestation, portées, petits qui suivent leur mère (les canetons en file indienne). La croissance est freinée par la densité et les saisons.
+- **Chaîne alimentaire** :
+  - les lapins, cerfs, bisons, souris et écureuils broutent ;
+  - le renard, le loup (chasse en meute), le lynx (affût), l'ours (baies, poissons, miel), l'aigle (piqué), le hibou (la nuit) et le héron (pêche à l'affût) chassent ;
+  - vautours et corbeaux nettoient les carcasses, qui finissent par fertiliser le sol.
+- **Défense** : les proies fuient. Les sangliers et les bisons font front quand un prédateur chasse leur troupeau. Les souris se cachent dans les hautes herbes et les écureuils dans les arbres.
+- **Castors** : ils abattent des arbres et construisent des barrages qui créent des étangs.
+- **Climat** :
+  - cycle jour/nuit ;
+  - 4 saisons (baies en été, noix en automne, neige et hibernation des ours en hiver) ;
+  - pluie et orages, la foudre pouvant déclencher des incendies.
 
-- **Infanterie (11)** : fusilier, mitrailleur, sniper, lance-roquettes, grenadier, lance-flammes, médecin, officier, bouclier balistique, commando, sapeur C4.
-- **Véhicules (6)** : jeep mitrailleuse, blindé de transport, char d'assaut, obusier, lance-roquettes multiple, véhicule anti-aérien.
-- **Aérien (4)** : drone kamikaze, drone bombardier, hélicoptère, avion d'attaque.
-- **Bâtiments (11)** : caserne, usine de blindés, héliport, base de drones, hôpital de campagne, quartier général, bunker, tourelle automatique, batterie de missiles sol-air, mine, dépôt de carburant.
-- **Terrain** : forêt, herbes hautes, eau, eau profonde, boue, sable, route, rochers, mur de béton, sacs de sable, barbelés, plus le feu et la gomme.
+## Easter eggs
 
-Comportements notables :
+Il y en a plein. Quelques indices :
+- un lapin doré ou des animaux albinos naissent parfois ;
+- une créature légendaire apparaît dans les écosystèmes très équilibrés ;
+- les loups réagissent à la pleine lune, et quelque chose rôde parfois la nuit dans les grandes forêts ;
+- relis tes fables de La Fontaine (le renard et le corbeau) ;
+- embrasse une grenouille ;
+- un arc-en-ciel peut apparaître après la pluie ;
+- au clavier, essaie de taper : `nessie`, `dodo`, `bigfoot`, `licorne`, `lune`… et le code Konami.
 
-- **Unités aériennes** : elles survolent murs, rivières et troupes. Seules les armes à feu, les roquettes et la DCA peuvent les toucher, et les armes légères ratent souvent les cibles volantes.
-- **Drones kamikazes** : ils visent en priorité les blindés et les bâtiments. Les **drones bombardiers** larguent puis s'écartent pour revenir. Les **avions** font des passes de bombardement et reviennent.
-- **Véhicule anti-aérien** et **batterie de missiles** (missiles à tête chercheuse) : ils ne tirent que sur ce qui vole.
-- **Char** : blindage énorme, les balles ricochent. **Lance-roquettes** : dégâts ×2,5 sur blindés, bâtiments et hélicoptères.
-- **Blindé de transport** : 4 fusiliers en sortent quand il est détruit.
-- **Mines** : invisibles pour l'ennemi, elles explosent à son passage.
-- **Commando** : il s'infiltre derrière les lignes et vise snipers, médecins et officiers.
-- **Médecins** et **hôpital** soignent ; l'**officier** et le **QG** galvanisent les troupes proches.
-- **Feu**, **morale** (les unités submergées et blessées paniquent), **murs** contournés ou démolis.
+## Technique
 
-## Architecture (performances)
-
-- `js/sim.js` : simulation orientée données (tableaux typés, aucun objet par unité), pas fixe de 30 Hz.
-  - Grille spatiale reconstruite à chaque tick par tri par comptage (O(n)).
-  - Un **flow field** BFS par équipe pour le pathfinding global (contournement des murs et rivières, percée si l'ennemi est enfermé), recalculé de façon échelonnée.
-  - Un champ de distance « ennemi le plus proche » par équipe, qui permet aux recherches de cible de sauter les zones vides, plus un cache de cible par cellule et par équipe.
-  - Recherche de cible échelonnée par anneaux sur la grille ; collisions résolues en Jacobi sur des tableaux compactés dans l'ordre des cellules (sans biais gauche/droite).
-  - Les morts sont résolues simultanément en fin de tick (pas d'avantage au premier qui agit).
-- `js/render.js` : WebGL2, **un seul draw call instancié par couche**, tri en profondeur par counting sort, sol procédural en shader, couche persistante de décalques (cadavres, cratères, flèches plantées) dans un framebuffer.
-- `js/sprites.js` : tous les sprites sont dessinés procéduralement au démarrage dans un atlas, avec un masque pour la couleur d'équipe.
-
-Ordre de grandeur de la simulation (mesuré dans Node, sans rendu) : environ 9 à 16 ms par tick de simulation pour 50 000 unités en plein combat (scénario « Test de charge »), et moins de 3 ms pour 5 000 à 10 000 unités.
+- `js/eco.js` : simulation orientée données (tableaux typés), pas fixe de 30 Hz, grille spatiale avec masques d'espèces par cellule, champs de distance vers l'eau et la forêt, décisions échelonnées.
+- `js/render.js` : WebGL2 instancié, sol procédural (végétation, saisons, neige, eau animée), lumière jour/nuit.
+- `js/sprites.js` : tous les animaux et plantes sont dessinés par code au démarrage (style cartoon avec contour).

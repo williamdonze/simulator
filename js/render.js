@@ -50,7 +50,7 @@
   }`;
   const FS_SPRITE = `#version 300 es
   precision mediump float;
-  uniform sampler2D uBase; uniform sampler2D uMask;
+  uniform sampler2D uBase; uniform sampler2D uMask; uniform vec3 uLight;
   in vec2 vUV; in vec4 vColor; in vec4 vMisc;
   out vec4 o;
   void main(){
@@ -70,7 +70,9 @@
     c = mix(c, vec3(1.0), vMisc.x);
     c *= 1.0 - vMisc.y;
     a *= vMisc.w;
-    // mode 2 = additive (premultiplied with zero alpha)
+    // mode 3 = emissive glow (not darkened at night, additive)
+    if (mode > 2.5) { o = vec4(c * a, 0.0); return; }
+    c *= uLight;
     o = mode > 1.5 ? vec4(c * a, 0.0) : vec4(c * a, a);
   }`;
   const VS_GROUND = `#version 300 es
@@ -86,6 +88,7 @@
   precision highp float;
   uniform sampler2D uTerr; uniform sampler2D uDecal;
   uniform vec2 uWorld; uniform float uTime; uniform float uMid; uniform float uZoom;
+  uniform vec3 uLight; uniform float uSnow;
   in vec2 vW; out vec4 o;
   float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
@@ -106,16 +109,23 @@
     vec2 uv = w / uWorld;
     vec4 t = samp(w);
     vec3 c = t.rgb;
-    // cartoon border line between terrain types
-    vec3 cx = samp(w + vec2(1.6, 0.0)).rgb, cy = samp(w + vec2(0.0, 1.6)).rgb;
-    float ed = max(length(c - cx), length(c - cy));
-    float wa = t.a;
+    // cartoon border line between terrain types (type id in alpha)
+    float ax = samp(w + vec2(1.6, 0.0)).a, ay = samp(w + vec2(0.0, 1.6)).a;
+    float ed = max(abs(t.a - ax), abs(t.a - ay)) * 4.0;
+    float wa = smoothstep(9.6 / 16.0, 10.4 / 16.0, t.a);
+    // subtle grass texture
+    c *= 0.97 + vn(w * 0.6) * 0.06;
     if (wa > 0.01) {
       float r1 = sin(w.x * 0.07 + uTime * 1.3 + sin(w.y * 0.04 + uTime * 0.6) * 2.5);
       float r2 = sin(w.y * 0.09 - uTime * 0.9 + w.x * 0.02);
       c += wa * smoothstep(0.93, 0.99, r1 * 0.5 + 0.5) * smoothstep(0.2, 0.9, r2 * 0.5 + 0.5) * 0.35;
     }
     c = mix(c, c * 0.62, smoothstep(0.05, 0.14, ed));
+    if (uSnow > 0.0) {
+      float patchy = smoothstep(0.25, 0.75, vn(w * 0.05) * 0.6 + uSnow * 0.7);
+      c = mix(c, vec3(0.96, 0.97, 1.0), (1.0 - wa) * patchy * min(1.0, uSnow * 1.3));
+      c = mix(c, vec3(0.82, 0.9, 0.96), wa * smoothstep(0.6, 0.9, uSnow) * 0.85);
+    }
     vec4 d = texture(uDecal, vec2(uv.x, 1.0 - uv.y));
     c = c * (1.0 - d.a) + d.rgb;
     if (uMid > 0.0) {
@@ -123,7 +133,7 @@
       float dash = step(mod(w.y, 26.0), 15.0);
       c = mix(c, vec3(0.55, 0.55, 0.6), uMid * dash * (1.0 - smoothstep(0.6, 1.8, dm)) * 0.8);
     }
-    o = vec4(c, 1.0);
+    o = vec4(c * uLight, 1.0);
   }`;
 
   function compile(vs, fs) {
@@ -244,43 +254,59 @@
   const objX = [], objY = [], objF = [], objC = [];
   let nObj = 0;
   function uploadTerrain() {
-    const S = G.S, terr = S.terr, fire = S.fireT, tvar = S.tvar;
+    const S = G.S, terr = S.terr, fire = S.fireT, tvar = S.tvar, veg = S.veg;
     const TER = G.TERRAIN;
     const px = terrPixels;
+    const season = S.season ? S.season() : 0;
+    // seasonal tint of living vegetation: spring fresh, summer warm, autumn golden, winter dull
+    const st = [[1, 1.02, 0.96], [1.04, 1, 0.9], [1.12, 0.98, 0.8], [0.98, 0.96, 0.98]][season];
     for (let c = 0, n = terr.length; c < n; c++) {
       const tt = terr[c];
-      const col = TER[tt].col;
-      const v = ((tvar[c] >> 2) - 32) / 32 * (tt === T.GRASS ? 0 : 0.025) + 1;
-      let r = col[0] * v, g = col[1] * v, b = col[2] * v;
+      const T0 = TER[tt], v = veg[c];
+      const lush = T0.lush, bare = T0.bare;
+      let r = bare[0] + (lush[0] - bare[0]) * v, g = bare[1] + (lush[1] - bare[1]) * v, b = bare[2] + (lush[2] - bare[2]) * v;
+      if (!T0.water && tt !== T.ROCK && tt !== T.SAND) { r *= st[0]; g *= st[1]; b *= st[2]; }
       if (fire[c] > 0) { r = r * 0.4 + 200; g = g * 0.4 + 70; b = b * 0.3 + 10; }
       const o = c * 4;
-      px[o] = r > 255 ? 255 : r; px[o + 1] = g > 255 ? 255 : g; px[o + 2] = b;
-      px[o + 3] = TER[tt].water ? 255 : 0;
+      px[o] = r > 255 ? 255 : r; px[o + 1] = g > 255 ? 255 : g; px[o + 2] = b > 255 ? 255 : b;
+      px[o + 3] = tt * 16;
     }
     gl.bindTexture(gl.TEXTURE_2D, texTerr);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, S.TW, S.TH, gl.RGBA, gl.UNSIGNED_BYTE, px);
   }
+  const objS = [];
   function rebuildObjects() {
-    const S = G.S, terr = S.terr, tvar = S.tvar, fire = S.fireT, TW = S.TW, TC = G.TC;
+    const S = G.S, terr = S.terr, tvar = S.tvar, fire = S.fireT, veg = S.veg, TW = S.TW, TC = G.TC;
     const FR = G.FR;
+    const season = S.season ? S.season() : 0;
     nObj = 0;
     const white = 0xffffffff;
     for (let c = 0, n = terr.length; c < n; c++) {
       const tt = terr[c];
-      if (tt === T.GRASS || tt === T.WATER || tt === T.DEEP || tt === T.MUD || tt === T.SAND || tt === T.ROAD || tt === T.TALL || tt === T.RUBBLE) continue;
-      const cx = (c % TW) * TC + 4, cy = ((c / TW) | 0) * TC + 4;
       const v = tvar[c];
-      let f = -1, ox = 0, oy = 0, col = white;
+      let f = -1, ox = ((v >> 3) & 3) - 1.5, oy = ((v >> 5) & 3) - 1.5, col = white, sc = 1;
       switch (tt) {
-        case T.FOREST: f = (v & 12) === 12 ? FR.pine : FR['tree' + ((v >> 4) % 3)]; ox = ((v >> 3) & 3) - 1.5; oy = ((v >> 5) & 3) - 1.5; if (fire[c] > 0) col = 0xff3070ff; break;
-        case T.ROCK: if ((v & 4) === 0 || (v & 16)) { f = FR['rock' + ((v >> 3) & 1)]; ox = ((v >> 5) & 3) - 1.5; } break;
-        case T.WALL: f = v & 1 ? FR.wallcr : FR.wall; break;
-        case T.PALI: f = FR.pali; if (fire[c] > 0) col = 0xff3060ff; break;
-        case T.SPIKES: if (v & 2 || (v & 8)) { f = FR.spikes; ox = ((v >> 4) & 3) - 1.5; oy = ((v >> 6) & 3) - 1.5; } break;
-        case T.BURNT: if ((v & 2) && ((v >> 4) & 3) === 0) { f = FR.treeburnt; ox = ((v >> 3) & 3) - 1.5; } break;
+        case T.FOREST: {
+          const pine = (v & 0x60) === 0x60;
+          if (pine) f = season === 3 ? FR.pineW : FR.pine;
+          else if (season === 3) f = FR.treeW;
+          else if (season === 2) f = FR['treeA' + ((v >> 4) & 1)];
+          else f = FR['tree' + ((v >> 4) % 3)];
+          if (v & 1 && veg[c] < 0.6) { f = FR.sapling; }
+          if (fire[c] > 0) col = 0xff3070ff;
+          break;
+        }
+        case T.BUSH: f = season === 3 ? FR.bushW : veg[c] > 0.45 && season > 0 ? FR.bushB : FR.bush; break;
+        case T.FLOWERS: if (season !== 3 && veg[c] > 0.25 && ((v >> 6) & 3) !== 3) { f = FR['flower' + ((v >> 4) % 5)]; sc = 0.8 + veg[c] * 0.3; } break;
+        case T.TALL: if (((v >> 6) & 3) !== 3) { f = season === 3 || veg[c] < 0.3 ? FR.tuftD : FR.tuft; sc = 0.6 + veg[c] * 0.6; } break;
+        case T.REEDS: if ((v >> 6) & 1 || (v >> 3) & 1) f = FR.reed; break;
+        case T.WATER: if ((v >> 3) === 7 && season < 3) { f = FR.lily; } break;
+        case T.ROCK: f = FR['rock' + ((v >> 3) & 1)]; break;
+        case T.GRASS: if (v & 4) f = FR.stump; break;
+        case T.BURNT: if ((v & 2) && ((v >> 4) & 3) === 0) f = FR.treeburnt; break;
       }
       if (f < 0) continue;
-      objX[nObj] = cx + ox; objY[nObj] = cy + oy; objF[nObj] = f; objC[nObj] = col;
+      objX[nObj] = (c % TW) * TC + 4 + ox; objY[nObj] = ((c / TW) | 0) * TC + 4 + oy; objF[nObj] = f; objC[nObj] = col; objS[nObj] = sc;
       nObj++;
     }
   }
@@ -298,11 +324,30 @@
   const MISC_TEAM = (255 << 24) >>> 0;              // flash 0 dark 0 mode 0 alpha 255
   const MISC_MULT = ((255 << 24) | (1 << 16)) >>> 0;
   const MISC_ADD = ((255 << 24) | (1 << 16)) >>> 0; // light cartoon ground: no additive blending
+  const MISC_GLOW = ((255 << 24) | (3 << 16)) >>> 0; // emissive (fireflies, sparkles at night)
+  function hsl(h) { const k = (n) => (n + h * 12) % 12; const f = (n) => 0.5 - 0.5 * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1)); return rgba(255 * f(0), 255 * f(8), 255 * f(4), 255); }
+  // daylight colour from the time of day, plus lightning flashes
+  R.light = function (S) {
+    const h = S.hour ? S.hour() : 12;
+    const day = [1, 1, 1], dusk = [1.0, 0.82, 0.68], night = [0.42, 0.48, 0.74];
+    let c;
+    const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+    if (h < 4.5 || h > 21.5) c = night;
+    else if (h < 6) c = mix(night, dusk, (h - 4.5) / 1.5);
+    else if (h < 7.5) c = mix(dusk, day, (h - 6) / 1.5);
+    else if (h < 18.5) c = day;
+    else if (h < 20) c = mix(day, dusk, (h - 18.5) / 1.5);
+    else c = mix(dusk, night, (h - 20) / 1.5);
+    if (S.rain > 0.1) c = mix(c, [c[0] * 0.8, c[1] * 0.82, c[2] * 0.9], S.rain);
+    if (S.lightning > 0) c = mix(c, [1.6, 1.6, 1.8], Math.min(1, S.lightning));
+    R.curLight = c;
+    return c;
+  };
   function misc(flash, dark, mode, alpha) { return ((flash & 255) | ((dark & 255) << 8) | ((mode & 255) << 16) | ((alpha & 255) << 24)) >>> 0; }
   R.misc = misc;
   function rgba(r, g, b, a) { return ((r & 255) | ((g & 255) << 8) | ((b & 255) << 16) | ((a & 255) << 24)) >>> 0; }
   R.rgba = rgba;
-  const TEAMC = G.TEAM_RGB.map((c) => rgba(c[0], c[1], c[2], 255));
+
 
   // copy staged instances [from, ni) into out buffer at position `at`, sorted by key if requested
   function flushSorted(from, at) {
@@ -343,6 +388,8 @@
   }
   function setSpriteUniforms(cx, cy, zoom, vw, vh) {
     const u = progSprite.u;
+    const L = R.curLight || [1, 1, 1];
+    gl.uniform3f(u.uLight, L[0], L[1], L[2]);
     gl.uniform2f(u.uCam, cx, cy); gl.uniform1f(u.uZoom, zoom); gl.uniform2f(u.uView, vw, vh);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texBase); gl.uniform1i(u.uBase, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texMask); gl.uniform1i(u.uMask, 1);
@@ -363,7 +410,7 @@
     if (nfx >= MAXFX) return -1;
     const i = nfx++;
     fxF[i] = f; fxX[i] = x; fxY[i] = y; fxZ[i] = z; fxVX[i] = vx; fxVY[i] = vy; fxVZ[i] = vz;
-    fxL[i] = life; fxM[i] = life; fxS0[i] = s0; fxS1[i] = s1; fxC[i] = col; fxFl[i] = fl; fxRot[i] = Math.random() * 6.28; fxVR[i] = 0; fxH[i] = 0;
+    fxL[i] = life; fxM[i] = life; fxS0[i] = s0; fxS1[i] = s1; fxC[i] = col; fxFl[i] = fl; fxRot[i] = f === G.FR.smoke || f === G.FR.chip ? Math.random() * 6.28 : 0; fxVR[i] = 0; fxH[i] = 0;
     return i;
   }
   const rnd = Math.random;
@@ -394,6 +441,23 @@
     smokePuff(x, y, n) {
       for (let k = 0; k < n; k++) P_(G.FR.smoke, x + (rnd() - 0.5) * 6, y - 4 + (rnd() - 0.5) * 6, 2, (rnd() - 0.5) * 30, (rnd() - 0.5) * 20, 10 + rnd() * 10, 0.6 + rnd() * 0.4, 6, 12, 0xd0e0e0e0, 0);
     },
+    poof(x, y) {
+      if (nfx > MAXFX * 0.8) return;
+      for (let k = 0; k < 4; k++) { const a = rnd() * 6.28; P_(G.FR.smoke, x + Math.cos(a) * 2, y + Math.sin(a) * 1.5, 0, Math.cos(a) * 10, Math.sin(a) * 6, 6 + rnd() * 6, 0.35 + rnd() * 0.2, 2, 6, 0xf0ffffff, 0); }
+    },
+    sparkle(x, y, n) {
+      for (let k = 0; k < n; k++) { const a = rnd() * 6.28, d = rnd() * 6; P_(G.FR.star, x + Math.cos(a) * d, y + Math.sin(a) * d, 0, 0, 0, 6 + rnd() * 8, 0.6 + rnd() * 0.5, 2.6, 0.5, 0xff80f0ff, 32); }
+    },
+    note(x, y) { P_(G.FR.note, x + (rnd() - 0.5) * 4, y, 0, (rnd() - 0.5) * 4, 0, 10, 1.4, 3.6, 3.6, 0xffffffff, 0); },
+    zzz(x, y) { P_(G.FR.zzz, x + 2, y, 0, 3, 0, 6, 1.6, 3.4, 2, 0xffffffff, 0); },
+    heart(x, y) { for (let k = 0; k < 2; k++) P_(G.FR.heart, x + (rnd() - 0.5) * 4, y, 0, (rnd() - 0.5) * 6, 0, 10 + rnd() * 5, 1.1, 3.4, 2.4, 0xffffffff, 0); },
+    tongue(x0, y0, x1, y1) {
+      const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy);
+      const i = P_(G.FR.white, x0, y0, 0, 0, 0, 0, 0.15, l, 0.6, 0xff9a7aff, 4);
+      if (i >= 0) fxRot[i] = Math.atan2(dy, dx);
+    },
+    clash(x, y) { for (let k = 0; k < 3; k++) P_(G.FR.star, x, y, 0, (rnd() - 0.5) * 30, (rnd() - 0.5) * 20, 10, 0.35, 2.4, 0.6, 0xffffffff, 0); },
+    fly(x, y) { if (nfx < MAXFX * 0.6) P_(G.FR.dot, x + (rnd() - 0.5) * 4, y, 3 + rnd() * 3, (rnd() - 0.5) * 12, (rnd() - 0.5) * 6, (rnd() - 0.5) * 4, 1.2, 0.7, 0.7, 0xff201818, 0); },
     trail(x, y) {
       if (nfx > MAXFX * 0.7) return;
       P_(G.FR.smoke, x + (rnd() - 0.5) * 2, y + (rnd() - 0.5) * 2, 0, 0, 0, 3, 0.5 + rnd() * 0.4, 2, 5, 0xc0e8e8e8, 0);
@@ -502,7 +566,9 @@
     const ug = progGround.u;
     gl.uniform2f(ug.uCam, cx, cy); gl.uniform1f(ug.uZoom, zoom); gl.uniform2f(ug.uView, vw, vh);
     gl.uniform2f(ug.uWorld, S.W, S.H); gl.uniform1f(ug.uTime, performance.now() / 1000);
-    gl.uniform1f(ug.uMid, S.phase === 'deploy' && G.ui && G.ui.showMid() ? 1 : 0);
+    gl.uniform1f(ug.uMid, 0);
+    const L = R.light(S);
+    gl.uniform3f(ug.uLight, L[0], L[1], L[2]); gl.uniform1f(ug.uSnow, S.snow || 0);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texTerr); gl.uniform1i(ug.uTerr, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texDecal); gl.uniform1i(ug.uDecal, 1);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -514,117 +580,90 @@
     const passes = [];
     const fw = R.fw, fh = R.fh;
     const FR = G.FR;
-    // pass A: projectile shadows (ground level)
-    const pr = S.proj;
+    // pass A: ground-level shadows of flying animals
+    const ux = S.x, uy = S.y, upx = S.px, upy = S.py, ut = S.type, ual = S.alive, uface = S.face, uatk = S.atk, ufl = S.flash, uan = S.anim;
+    const uz = S.z, usz = S.size, uvar = S.vari, ust = S.state, usex = S.sex;
+    const UF = G.unitFrames, UFM = G.unitFramesM, UFL = G.UFL, UR = G.UR, UHAB = G.UHAB;
+    const hwu = S.hw;
     let start = ni;
-    for (let p = 0, phw = pr.alive.length; p < phw; p++) {
-      if (!pr.alive[p]) continue;
-      const k = pr.kind[p];
-      if (k === P.FLAME || k === P.FIREBALL) continue;
-      const x = pr.px[p] + (pr.x[p] - pr.px[p]) * alpha, y = pr.py[p] + (pr.y[p] - pr.py[p]) * alpha;
+    for (let i = 0; i < hwu; i++) {
+      if (!ual[i] || !(UFL[ut[i]] & F.AIR) || uz[i] < 2) continue;
+      const x = upx[i] + (ux[i] - upx[i]) * alpha, y = upy[i] + (uy[i] - upy[i]) * alpha;
       if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
-      const big = k === P.STONE || k === P.CANNON || k === P.BBOLT || k === P.SHELL || k === P.BOMB || k === P.MISSILE;
-      put(x, y, big ? 5 : 3, big ? 2 : 1.2, 0, FR.shadow, 0xffffffff, MISC_MULT, 0);
-    }
-    // aircraft shadows
-    {
-      const ux = S.x, uy = S.y, upx = S.px, upy = S.py, ut = S.type, ual = S.alive, UFL = G.UFL, UR = G.UR;
-      for (let i = 0, n = S.hw; i < n; i++) {
-        if (!ual[i] || !(UFL[ut[i]] & F.AIR)) continue;
-        const x = upx[i] + (ux[i] - upx[i]) * alpha, y = upy[i] + (uy[i] - upy[i]) * alpha;
-        if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
-        const r = UR[ut[i]];
-        put(x, y, r * 2.4, r * 0.8, 0, FR.shadow, 0xb0ffffff, MISC_MULT, 0);
-      }
+      const r = UR[ut[i]] * usz[i];
+      put(x, y, r * 2.2, r * 0.7, 0, FR.shadow, 0x90ffffff, MISC_MULT, 0);
     }
     passes.push([at, flushPlain(start, at)]); at += ni - start;
 
-    // pass B: y-sorted world (objects, units, buildings, projectiles)
+    // pass B: y-sorted world (plants, animals)
     start = ni;
     for (let k = 0; k < nObj; k++) {
       const x = objX[k], y = objY[k];
       if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
-      const f = objF[k];
-      put(x, y, fw[f], fh[f], 0, f, objC[k], objC[k] === 0xffffffff ? MISC_MULT : MISC_MULT, (y + 64) | 0);
+      const f = objF[k], sc = objS[k];
+      put(x, y, fw[f] * sc, fh[f] * sc, 0, f, objC[k], MISC_MULT, (y + 64) | 0);
     }
-    const ux = S.x, uy = S.y, upx = S.px, upy = S.py, ut = S.type, utm = S.team, ual = S.alive, uface = S.face, uatk = S.atk, ufl = S.flash, uan = S.anim, uhp = S.hp;
-    const UF = G.unitFrames, UFL = G.UFL, UHP = G.UHP, UR = G.UR;
-    const hwu = S.hw;
-    const lod = zoom < 0.55; // far away: skip walk anim details
+    const SLEEP = S.ST.SLEEP, disco = S.disco > 0;
+    const night = S.isNight();
     for (let i = 0; i < hwu; i++) {
       if (!ual[i]) continue;
       const x = upx[i] + (ux[i] - upx[i]) * alpha;
       if (x < vx0 || x > vx1) continue;
       const y = upy[i] + (uy[i] - upy[i]) * alpha;
       if (y < vy0 || y > vy1) continue;
-      const t = ut[i];
-      const fl = UFL[t];
-      let f, bob = 0, key = (y + 64) | 0;
-      if (fl & F.AIR) {
-        const alt = G.UALT[t];
-        f = UF[t * 3 + (uatk[i] > 0 ? 2 : (((now * 24) | 0) + i) & 1)];
-        put(x, y - alt + Math.sin(now * 3 + i) * 1.2, fw[f] * uface[i], fh[f], 0, f, TEAMC[utm[i]], misc(ufl[i] > 0 ? 170 : 0, 0, 0, 255), Math.min(NKEY - 1, key + 2200));
-        continue;
-      }
-      if (fl & F.BUILD) f = UF[t * 3];
-      else if (uatk[i] > 0) f = UF[t * 3 + 2];
+      const t = ut[i], fl = UFL[t];
+      const base = (usex[i] ? UFM : UF), o = t * 4;
+      let f, bob = 0, key = (y + 64) | 0, z = 0;
+      const moving = ux[i] !== upx[i] || uy[i] !== upy[i];
+      if (fl & F.CARCASS) f = base[o];
+      else if (fl & F.AIR) {
+        z = uz[i];
+        if (z < 1.5 && !moving) f = base[o + 3];
+        else if (uatk[i] > 0 && z > 3) f = base[o + 2];
+        else f = base[o + ((((now * (UR[t] < 2 ? 30 : 6)) | 0) + i) & 1)];
+        if (z > 1) { key = Math.min(NKEY - 1, key + 2000); z += Math.sin(now * 2 + i) * 0.8; }
+      } else if (ust[i] === SLEEP) f = base[o + 3];
+      else if (uatk[i] > 0) f = base[o + 2];
       else {
-        const moving = ux[i] !== upx[i] || uy[i] !== upy[i];
         const ph = uan[i];
-        f = UF[t * 3 + (moving ? ((ph | 0) & 1) : 0)];
-        if (moving && !lod) bob = Math.abs(Math.sin(ph * 3.14159)) * 0.7;
+        f = base[o + (moving ? ((ph | 0) & 1) : 0)];
+        if (moving && !(fl & F.STATIC) && UHAB[t] !== 1) bob = Math.abs(Math.sin(ph * 3.14159)) * 0.5;
       }
-      let dark = 0;
-      if (fl & F.BUILD) dark = ((1 - uhp[i] / UHP[t]) * 90) | 0;
-      const fla = ufl[i] > 0 ? 170 : 0;
-      put(x, y - bob, fw[f] * (fl & F.BUILD ? 1 : uface[i]), fh[f], 0, f, TEAMC[utm[i]], misc(fla, dark, 0, 255), (y + 64) | 0);
-    }
-    for (let p = 0, phw = pr.alive.length; p < phw; p++) {
-      if (!pr.alive[p]) continue;
-      const k = pr.kind[p];
-      const x = pr.px[p] + (pr.x[p] - pr.px[p]) * alpha, y = pr.py[p] + (pr.y[p] - pr.py[p]) * alpha;
-      if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
-      const z = pr.pz[p] + (pr.z[p] - pr.pz[p]) * alpha;
-      let rot, f, w, h, col = 0xffffffff, m = MISC_MULT;
-      if (k === P.SHELL || k === P.MRL || k === P.BOMB) {
-        const ox = pr.px[p], oy = pr.py[p] - pr.pz[p];
-        rot = Math.atan2(pr.y[p] - pr.z[p] - oy, pr.x[p] - ox);
-        f = k === P.SHELL ? FR.shell : k === P.MRL ? FR.mrl : FR.bomb;
-        if (k === P.MRL && simDt > 0 && rnd() < 0.4) fx.trail(x, y - z);
-      } else if (k === P.ARROW || k === P.JAVELIN || k === P.GRENADE || k === P.STONE) {
-        const T0 = pr.T[p], tt = Math.min(1, pr.t[p] / T0);
-        const ddx = (pr.tx[p] - pr.sx[p]) / T0, ddy = (pr.ty[p] - pr.sy[p]) / T0;
-        const dz = pr.h[p] * 4 * (1 - 2 * tt) / T0 - 6 / T0;
-        rot = Math.atan2(ddy - dz, ddx);
-        f = k === P.ARROW ? FR.arrow : k === P.JAVELIN ? FR.javelin : k === P.GRENADE ? FR.grenade : FR.stone;
-        if (k === P.GRENADE || k === P.STONE) rot = pr.t[p] * 8;
-      } else {
-        rot = Math.atan2(pr.vy[p], pr.vx[p]);
-        switch (k) {
-          case P.BOLT: f = FR.bolt; break;
-          case P.BBOLT: f = FR.bbolt; col = TEAMC[pr.team[p]]; m = MISC_TEAM; break;
-          case P.CANNON: f = FR.ball; break;
-          case P.TSHELL: f = FR.shell; break;
-          case P.ROCKET: f = FR.rocket; if (simDt > 0 && rnd() < 0.6) fx.trail(x, y - z); break;
-          case P.MISSILE: f = FR.missile; if (simDt > 0) fx.trail(x, y - z); break;
-          case P.SHURIKEN: f = FR.shuriken; rot = pr.t[p] * 25; break;
-          case P.FIREBALL: f = FR.fireball; m = MISC_ADD; col = 0xff40b0ff; break;
-          case P.FLAME: {
-            f = FR.flame; m = MISC_ADD;
-            const tt = pr.t[p] / pr.T[p];
-            const s = 3 + tt * 9;
-            const a = (255 * (1 - tt * 0.8)) | 0;
-            col = rgba(255, (200 - tt * 140) | 0, (90 - tt * 80) | 0, a);
-            put(x, y - z, s, s, 0, f, col, m, (y + 64) | 0);
-            continue;
-          }
-          default: f = FR.spark;
-        }
-      }
-      w = fw[f]; h = fh[f];
-      put(x, y - z, w, h, rot, f, col, m, (y + 64) | 0);
+      const sc = usz[i];
+      let col = 0xffffffff, fla = ufl[i] > 0 ? 160 : 0, alphaA = 255;
+      if (uvar[i] === 1) { col = 0xff40d8ff; }                 // golden
+      else if (uvar[i] === 2) { fla = Math.max(fla, 150); }    // albino
+      if (disco) { const h = (now * 2 + i * 0.37) % 1; col = hsl(h); }
+      if (UHAB[t] === 1) { alphaA = 190; col = 0xffffd8c8; }    // fish: under water, bluish
+      if (t === G.U.nessie && ((now * 0.2 + i) % 1) > 0.8) alphaA = 120;
+      put(x, y - bob - z, fw[f] * sc * uface[i], fh[f] * sc, 0, f, col, misc(fla, 0, 1, alphaA), key);
+      if (uvar[i] === 4) put(x + uface[i] * UR[t] * 1.5 * sc, y - z - UR[t] * 0.9, 2.4, 2, 0, FR.cheese, 0xffffffff, MISC_MULT, key + 1);
+      if (uvar[i] === 1 && ((now * 3 + i) % 1) < 0.08) fx.sparkle(x, y - 4, 1);
+      if (fl & F.MAGIC && t === G.U.unicorn && rnd() < 0.05) fx.sparkle(x, y - 10, 1);
     }
     passes.push([at, flushSorted(start, at)]); at += ni - start;
+
+    // weather & ambient particles (spawned per frame, screen-space density)
+    if (simDt > 0) {
+      const area = (vx1 - vx0) * (vy1 - vy0);
+      if (S.rain > 0.05) {
+        const snow = S.weather === 'snow';
+        const n = Math.min(40, area * S.rain / (snow ? 12000 : 5000));
+        for (let k = 0; k < n; k++) {
+          const xx = vx0 + rnd() * (vx1 - vx0), yy = vy0 + rnd() * (vy1 - vy0);
+          if (snow) P_(G.FR.dot, xx, yy, 40, (rnd() - 0.5) * 8, 0, -14 - rnd() * 8, 3, 1.1, 1.1, 0xf0ffffff, 0);
+          else P_(G.FR.drop, xx, yy, 50, -6, 0, -260, 0.2, 2, 8, 0xc0ffffff, 0);
+        }
+      }
+      // fireflies: warm nights near water and forest
+      if (night && S.season() === 1 && rnd() < 0.6) {
+        for (let k = 0; k < 3; k++) {
+          const xx = vx0 + rnd() * (vx1 - vx0), yy = vy0 + rnd() * (vy1 - vy0);
+          const tt = S.terr[S.tcell(Math.max(0, Math.min(S.W - 1, xx)), Math.max(0, Math.min(S.H - 1, yy)))];
+          if (tt === T.FOREST || tt === T.REEDS || tt === T.TALL || tt === T.WATER) P_(G.FR.glow, xx, yy, 4 + rnd() * 6, (rnd() - 0.5) * 8, (rnd() - 0.5) * 6, (rnd() - 0.5) * 3, 2 + rnd() * 2, 2.2, 2.2, 0xff60ffd0, 32);
+        }
+      }
+    }
 
     // pass C: particles
     start = ni;
@@ -635,34 +674,23 @@
       const fl = fxFl[i];
       const f = fxF[i];
       const c = fxC[i];
-      const a = ((c >>> 24) * (fl & 1 ? life : Math.min(1, life * 2.2))) | 0;
+      let a = ((c >>> 24) * (fl & 1 ? life : Math.min(1, life * 2.2))) | 0;
+      if (fl & 32) a = ((c >>> 24) * (0.5 + 0.5 * Math.sin(now * 6 + i))) | 0;
       const col = ((c & 0xffffff) | (a << 24)) >>> 0;
-      if (fl & 4) { put(x, y - fxZ[i], fxS0[i], fxS1[i], fxRot[i], f, col, MISC_ADD, 0); continue; }
-      const s = fxS1[i] + (fxS0[i] - fxS1[i]) * life;
-      put(x, y - fxZ[i], s, s, fxRot[i], f, col, fl & 1 ? MISC_ADD : MISC_MULT, 0);
+      const m = fl & 32 ? MISC_GLOW : MISC_MULT;
+      if (fl & 4) { put(x, y - fxZ[i], fxS0[i], fxS1[i], fxRot[i], f, col, m, 0); continue; }
+      const sz = fxS1[i] + (fxS0[i] - fxS1[i]) * life;
+      put(x, y - fxZ[i], sz, sz, fxRot[i], f, col, m, 0);
     }
     passes.push([at, flushPlain(start, at)]); at += ni - start;
 
-    // pass D: health bars
+    // pass D: overlays
     start = ni;
-    if (zoom > 0.35) {
-      const showUnits = G.ui && G.ui.opts.bars;
-      const barsH = 1.1;
-      for (let i = 0; i < hwu; i++) {
-        if (!ual[i]) continue;
-        const t = ut[i], fl = UFL[t];
-        if (!(fl & F.BUILD) && !showUnits) continue;
-        const f = uhp[i] / UHP[t];
-        if (f >= 0.999 || fl & F.NEUTRAL) continue;
-        const x = upx[i] + (ux[i] - upx[i]) * alpha, y = upy[i] + (uy[i] - upy[i]) * alpha;
-        if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
-        const r = UR[t];
-        const top = fl & F.BUILD ? y - fh[UF[t * 3]] * (G.frames[UF[t * 3]].py) - 3 : y - (r > 5 ? 22 : 16);
-        const w = fl & F.BUILD ? r * 1.6 : 9;
-        put(x - w / 2 - 0.3, top - 0.3, w + 0.6, barsH + 0.6, 0, FR.white, 0xc0000000, MISC_MULT, 0);
-        const g = (f * 255) | 0;
-        put(x - w / 2, top, w * f, barsH, 0, FR.white, rgba(255 - g, 60 + g * 0.7, 50, 255), MISC_MULT, 0);
-      }
+    if (G.ui && G.ui.selected >= 0 && ual[G.ui.selected]) {
+      const i = G.ui.selected, t = ut[i];
+      const x = upx[i] + (ux[i] - upx[i]) * alpha, y = upy[i] + (uy[i] - upy[i]) * alpha;
+      const r = Math.max(4, UR[t] * 1.6);
+      put(x, y - (UFL[t] & F.AIR ? uz[i] : 0), r * 2 / 0.875, r * 1.2 / 0.875, 0, FR.ring, 0xff3cc8ff, MISC_MULT, 0);
     }
     // brush preview & selection ring
     if (G.ui && G.ui.brushPreview) {
