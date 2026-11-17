@@ -44,7 +44,8 @@
     vec2 lp = (aCorner - pv.xy) * aPosSize.zw;
     float s = sin(aRotFrame.x), c = cos(aRotFrame.x);
     lp = vec2(lp.x * c - lp.y * s, lp.x * s + lp.y * c);
-    vec2 sp = (aPosSize.xy + lp - uCam) * uZoom;
+    // snap to the pixel grid: crisp pixel art, no shimmering
+    vec2 sp = floor((aPosSize.xy - uCam) * uZoom + 0.5) + floor(lp * uZoom + 0.5);
     gl_Position = vec4(sp.x / uView.x * 2.0 - 1.0, 1.0 - sp.y / uView.y * 2.0, 0.0, 1.0);
     vColor = aColor; vMisc = aMisc;
   }`;
@@ -93,47 +94,44 @@
   float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
     return mix(mix(h21(i), h21(i+vec2(1,0)), f.x), mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), f.x), f.y); }
-  vec4 samp(vec2 w) {
-    vec2 ts = vec2(textureSize(uTerr, 0));
-    vec2 warp = vec2(vn(w * 0.09), vn(w * 0.09 + 17.3)) - 0.5;
-    vec2 p = w / uWorld * ts - 0.5 + warp * 1.0;
-    vec2 fp = smoothstep(0.42, 0.58, fract(p));
-    return texture(uTerr, (floor(p) + fp + 0.5) / ts);
-  }
+  vec4 cellT(vec2 c) { ivec2 ts = textureSize(uTerr, 0); return texelFetch(uTerr, clamp(ivec2(c), ivec2(0), ts - 1), 0); }
   void main(){
-    vec2 w = vW;
-    if (w.x < 0.0 || w.y < 0.0 || w.x > uWorld.x || w.y > uWorld.y) {
-      float e = max(max(-w.x, w.x - uWorld.x), max(-w.y, w.y - uWorld.y));
-      o = vec4(0.965, 0.965, 0.94, 1.0); return;
+    vec2 px = floor(vW);               // one ground pixel per world unit
+    vec2 w = px + 0.5;
+    if (w.x < 0.0 || w.y < 0.0 || w.x > uWorld.x || w.y > uWorld.y) { o = vec4(vec3(0.16, 0.24, 0.13) * uLight, 1.0); return; }
+    vec2 ts = vec2(textureSize(uTerr, 0));
+    // organic borders: noisy warp, then a dithered choice between neighbouring cells
+    vec2 warp = (vec2(vn(w * 0.06), vn(w * 0.06 + 17.3)) - 0.5) * 1.6 + (vec2(h21(px), h21(px + 7.1)) - 0.5) * 0.35;
+    vec2 p = w / uWorld * ts - 0.5 + warp;
+    vec2 i0 = floor(p), f = smoothstep(0.1, 0.9, fract(p));
+    vec2 c = i0 + vec2(h21(px + 3.3) < f.x ? 1.0 : 0.0, h21(px + 9.7) < f.y ? 1.0 : 0.0);
+    vec4 t = cellT(c);
+    float tt = floor(t.a * 255.0 / 16.0 + 0.5);
+    vec3 col = t.rgb;
+    if (tt < 9.5) {
+      // grass: three tones in soft patches, plus single-pixel speckles
+      float n = vn(w * 0.09) * 0.55 + vn(w * 0.31) * 0.3 + h21(px * 1.3) * 0.15;
+      col *= n < 0.36 ? 0.9 : n > 0.68 ? 1.07 : 1.0;
+      if (h21(px + 51.0) > 0.985) col *= 1.12;
+    } else {
+      // water: deeper toward the middle, pixel glints that drift
+      float g = sin(w.x * 0.21 + uTime * 1.1 + sin(w.y * 0.13 + uTime * 0.35) * 2.2) * sin(w.y * 0.47 - uTime * 0.7);
+      if (g > 0.86) col = mix(col, vec3(0.86, 0.95, 1.0), 0.5);
+      else if (g > 0.7) col = mix(col, vec3(0.86, 0.95, 1.0), 0.18);
+      // shallow rim: lighter when a neighbouring cell is land
+      float land = 0.0;
+      for (int k = 0; k < 4; k++) {
+        vec2 d = k == 0 ? vec2(1, 0) : k == 1 ? vec2(-1, 0) : k == 2 ? vec2(0, 1) : vec2(0, -1);
+        if (cellT(floor(p + d * 0.6 + 0.5)).a * 255.0 / 16.0 < 9.5) land = 1.0;
+      }
+      col = mix(col, col * 1.08 + vec3(0.04, 0.05, 0.03), land * 0.6);
     }
-    vec2 uv = w / uWorld;
-    vec4 t = samp(w);
-    vec3 c = t.rgb;
-    // cartoon border line between terrain types (type id in alpha)
-    float ax = samp(w + vec2(1.6, 0.0)).a, ay = samp(w + vec2(0.0, 1.6)).a;
-    float ed = max(abs(t.a - ax), abs(t.a - ay)) * 4.0;
-    float wa = smoothstep(9.6 / 16.0, 10.4 / 16.0, t.a);
-    // subtle grass texture
-    c *= 0.97 + vn(w * 0.6) * 0.06;
-    if (wa > 0.01) {
-      float r1 = sin(w.x * 0.07 + uTime * 1.3 + sin(w.y * 0.04 + uTime * 0.6) * 2.5);
-      float r2 = sin(w.y * 0.09 - uTime * 0.9 + w.x * 0.02);
-      c += wa * smoothstep(0.93, 0.99, r1 * 0.5 + 0.5) * smoothstep(0.2, 0.9, r2 * 0.5 + 0.5) * 0.35;
-    }
-    c = mix(c, c * 0.62, smoothstep(0.05, 0.14, ed));
     if (uSnow > 0.0) {
-      float patchy = smoothstep(0.25, 0.75, vn(w * 0.05) * 0.6 + uSnow * 0.7);
-      c = mix(c, vec3(0.96, 0.97, 1.0), (1.0 - wa) * patchy * min(1.0, uSnow * 1.3));
-      c = mix(c, vec3(0.82, 0.9, 0.96), wa * smoothstep(0.6, 0.9, uSnow) * 0.85);
+      float sn = vn(w * 0.05) * 0.6 + uSnow * 0.75 - h21(px) * 0.12;
+      if (tt < 9.5 && sn > 0.62) col = mix(col, vec3(0.93, 0.95, 0.98), 0.92);
+      if (tt >= 9.5 && uSnow > 0.7) col = mix(col, vec3(0.78, 0.88, 0.95), 0.75);
     }
-    vec4 d = texture(uDecal, vec2(uv.x, 1.0 - uv.y));
-    c = c * (1.0 - d.a) + d.rgb;
-    if (uMid > 0.0) {
-      float dm = abs(w.x - uWorld.x * 0.5) * uZoom;
-      float dash = step(mod(w.y, 26.0), 15.0);
-      c = mix(c, vec3(0.55, 0.55, 0.6), uMid * dash * (1.0 - smoothstep(0.6, 1.8, dm)) * 0.8);
-    }
-    o = vec4(c * uLight, 1.0);
+    o = vec4(col * uLight, 1.0);
   }`;
 
   function compile(vs, fs) {
@@ -173,16 +171,14 @@
     bindInst(0);
 
     // atlas
-    texBase = makeTex(gl.LINEAR);
+    texBase = makeTex(gl.NEAREST);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, G.atlasBase);
-    gl.generateMipmap(gl.TEXTURE_2D);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-    texMask = makeTex(gl.LINEAR);
+
+    texMask = makeTex(gl.NEAREST);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, G.atlasMask);
-    gl.generateMipmap(gl.TEXTURE_2D);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+
 
     // frame table
     const fr = G.frames, nf = fr.length;
@@ -227,7 +223,7 @@
   R.initWorld = function () {
     const S = G.S;
     if (texTerr) gl.deleteTexture(texTerr);
-    texTerr = makeTex(gl.LINEAR);
+    texTerr = makeTex(gl.NEAREST);
     terrPixels = new Uint8Array(S.TW * S.TH * 4);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, S.TW, S.TH, 0, gl.RGBA, gl.UNSIGNED_BYTE, terrPixels);
     if (texDecal) { gl.deleteTexture(texDecal); gl.deleteFramebuffer(fboDecal); }
@@ -545,6 +541,18 @@
     R.dpr = dpr;
   };
 
+  let lowFbo = null, lowTex = null, lowW = 0, lowH = 0;
+  function ensureLow(w, h) {
+    if (lowFbo && w === lowW && h === lowH) return;
+    if (lowFbo) { gl.deleteFramebuffer(lowFbo); gl.deleteTexture(lowTex); }
+    lowTex = makeTex(gl.NEAREST);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    lowFbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, lowFbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, lowTex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    lowW = w; lowH = h;
+  }
   R.draw = function (alpha, realDt, simDt) {
     const S = G.S;
     R.resize();
@@ -554,8 +562,12 @@
     drawDecals();
 
     const cam = G.cam, dpr = R.dpr;
-    const vw = canvas.width, vh = canvas.height;
-    const zoom = cam.zoom * dpr;
+    // the whole scene is drawn into a small buffer (1 pixel per world unit) then scaled up
+    const PXS = (G.PX || 2) * dpr;
+    const vw = Math.ceil(canvas.width / PXS), vh = Math.ceil(canvas.height / PXS);
+    ensureLow(vw, vh);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, lowFbo);
+    const zoom = cam.zoom * dpr / PXS;
     let cx = cam.x, cy = cam.y;
     if (G.shake > 0.05) { cx += (rnd() - 0.5) * G.shake / cam.zoom; cy += (rnd() - 0.5) * G.shake / cam.zoom; G.shake *= 0.88; }
     const vx0 = cx - 40, vy0 = cy - 60, vx1 = cx + vw / zoom + 40, vy1 = cy + vh / zoom + 80;
@@ -586,12 +598,23 @@
     const UF = G.unitFrames, UFM = G.unitFramesM, UFL = G.UFL, UR = G.UR, UHAB = G.UHAB;
     const hwu = S.hw;
     let start = ni;
+    const SH = 0x48081408; // soft dark-green shadow
     for (let i = 0; i < hwu; i++) {
-      if (!ual[i] || !(UFL[ut[i]] & F.AIR) || uz[i] < 2) continue;
+      if (!ual[i]) continue;
+      const t = ut[i];
+      if (UHAB[t] === 1 || UHAB[t] === 5) continue; // fish / nessie: no shadow
       const x = upx[i] + (ux[i] - upx[i]) * alpha, y = upy[i] + (uy[i] - upy[i]) * alpha;
       if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
-      const r = UR[ut[i]] * usz[i];
-      put(x, y, r * 2.2, r * 0.7, 0, FR.shadow, 0x90ffffff, MISC_MULT, 0);
+      const f = UF[t * 4], w = fw[f] * 0.72 * usz[i];
+      put(x, y + 1, w, Math.max(2, w * 0.3), 0, FR.shadow, SH, MISC_MULT, 0);
+    }
+    for (let k = 0; k < nObj; k++) {
+      const f = objF[k];
+      if (fh[f] < 9) continue;
+      const x = objX[k], y = objY[k];
+      if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
+      const w = fw[f] * 0.8 * objS[k];
+      put(x, y + 1, w, Math.max(2, w * 0.32), 0, FR.shadow, SH, MISC_MULT, 0);
     }
     passes.push([at, flushPlain(start, at)]); at += ni - start;
 
@@ -629,7 +652,7 @@
         f = base[o + (moving ? ((ph | 0) & 1) : 0)];
         if (moving && !(fl & F.STATIC) && UHAB[t] !== 1) bob = Math.abs(Math.sin(ph * 3.14159)) * 0.5;
       }
-      const sc = usz[i];
+      const sc = usz[i] < 0.62 ? 0.5 : usz[i] < 0.88 ? 0.75 : 1;
       let col = 0xffffffff, fla = ufl[i] > 0 ? 160 : 0, alphaA = 255;
       if (uvar[i] === 1) { col = 0xff40d8ff; }                 // golden
       else if (uvar[i] === 2) { fla = Math.max(fla, 150); }    // albino
@@ -711,6 +734,12 @@
       bindInst(first);
       gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, n);
     }
+    // upscale with nearest filtering: chunky, crisp pixels
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, lowFbo);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+    gl.clearColor(0.16, 0.24, 0.13, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.blitFramebuffer(0, 0, vw, vh, 0, canvas.height - vh * PXS, vw * PXS, canvas.height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   };
   R.nfx = () => nfx;
   R.tickFx = updateFx;

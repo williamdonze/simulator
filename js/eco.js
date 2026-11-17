@@ -701,7 +701,7 @@
           else size[i] = Math.min(1.6, 0.45 + store[i] * 0.25);
         } else if (fl & F.HIVE) {
           store[i] = Math.min(40, store[i]);
-          if (((tick + i) % 90) === 0 && !night && season !== 3 && store[i] > 1 && countNear(i, 160, 1 << U.bee) < 24) {
+          if (((tick + i) % 90) === 0 && !night && season !== 3 && store[i] > 1 && countNear(i, 160, 1 << U.bee) < 10) {
             const b = S.spawn(U.bee, x[i], y[i] - 2, { home: i });
             if (b >= 0) store[i] -= 0.5;
           }

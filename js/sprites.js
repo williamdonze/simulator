@@ -12,8 +12,8 @@
   const mask = document.createElement('canvas');
   base.width = mask.width = AW;
   base.height = mask.height = AH;
-  const cb = base.getContext('2d');
-  const cm = mask.getContext('2d');
+  let cb = base.getContext('2d');
+  let cm = mask.getContext('2d');
 
   const frames = []; // {name,x,y,w,h (px), ww, wh (world), px, py (pivot 0..1)}
   const FR = {};
@@ -75,47 +75,83 @@
   }
 
   // Register a frame: ww/wh world size, pivot (0..1), draw(ctx coords in world units)
-  const OL = '#2b2433';
+  const OL = '#4a3a34';
   const tmpC = document.createElement('canvas');
   const tmpX = tmpC.getContext('2d');
   // cartoon contour: dilate the opaque silhouette behind the sprite
-  function outlinePass(r, pw, ph, t) {
-    pw = Math.ceil(pw); ph = Math.ceil(ph);
-    const img = cb.getImageData(r.x, r.y, pw, ph);
-    const d = img.data;
-    tmpC.width = pw; tmpC.height = ph;
-    const sil = tmpX.createImageData(pw, ph), o = sil.data;
-    for (let k = 0; k < d.length; k += 4) if (d[k + 3] > 140) { o[k] = 43; o[k + 1] = 36; o[k + 2] = 51; o[k + 3] = 255; }
-    tmpX.putImageData(sil, 0, 0);
-    for (const c of [cb, cm]) {
-      c.save();
-      c.beginPath(); c.rect(r.x, r.y, pw, ph); c.clip();
-      c.globalCompositeOperation = 'destination-over';
-      if (c === cm) { tmpX.globalCompositeOperation = 'source-in'; tmpX.fillStyle = '#000'; tmpX.fillRect(0, 0, pw, ph); tmpX.globalCompositeOperation = 'source-over'; }
-      for (let a = 0; a < 12; a++) {
-        const an = (a / 12) * Math.PI * 2;
-        c.drawImage(tmpC, r.x + Math.cos(an) * t, r.y + Math.sin(an) * t);
-      }
-      c.restore();
-    }
-  }
+  // ------------------------------------------------------------------ pixel-art frames
+  // Each sprite is drawn with vector shapes at high resolution, then reduced to
+  // real pixels: hard alpha, dominant colour per pixel (no blur), and a 1-px
+  // outline in a darker shade of the neighbouring colour.
+  const K = (G.PIXK = 1.5);        // art pixels per drawing unit
+  const SS = 4;                     // supersampling
+  const hi = document.createElement('canvas');
+  const hx = hi.getContext('2d', { willReadFrequently: true });
+  const dummy = document.createElement('canvas').getContext('2d');
   function frame(name, ww, wh, pvx, pvy, draw, team = true, ol = team) {
-    const pw = ww * S, ph = wh * S;
-    const r = alloc(pw, ph);
-    cb.save(); cm.save();
-    cb.translate(r.x, r.y); cm.translate(r.x, r.y);
-    cb.beginPath(); cb.rect(0, 0, pw, ph); cb.clip();
-    cm.beginPath(); cm.rect(0, 0, pw, ph); cm.clip();
-    cb.scale(S, S); cm.scale(S, S);
-    cb.lineCap = cm.lineCap = 'round';
-    cb.lineJoin = cm.lineJoin = 'round';
-    pen.team = team;
+    const pw = Math.max(1, Math.round(ww * K)), ph = Math.max(1, Math.round(wh * K));
+    const r = alloc(pw + 2, ph + 2);
+    const ox = r.x + 1, oy = r.y + 1;                 // 1px margin for the outline
+    hi.width = (pw + 2) * SS; hi.height = (ph + 2) * SS;
+    hx.setTransform(1, 0, 0, 1, 0, 0);
+    hx.clearRect(0, 0, hi.width, hi.height);
+    hx.translate(SS, SS); hx.scale(K * SS, K * SS);
+    hx.lineCap = 'round'; hx.lineJoin = 'round';
+    const sb = cb, sm = cm;
+    cb = hx; cm = dummy; pen.team = false;
     draw();
-    pen.team = true;
-    cb.restore(); cm.restore();
-    if (ol) outlinePass(r, pw, ph, ol === 'thin' ? 1.5 : 2.4);
+    cb = sb; cm = sm; pen.team = true;
+    const src = hx.getImageData(0, 0, hi.width, hi.height).data;
+    const W2 = pw + 2, H2 = ph + 2;
+    const out = cb.createImageData(W2, H2), o = out.data;
+    const sw = hi.width;
+    if (ol === false) {
+      // soft sprite (smoke, glow…): plain box filter
+      for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) {
+        let R = 0, Gc = 0, B = 0, A = 0;
+        for (let sy = 0; sy < SS; sy++) for (let sx = 0; sx < SS; sx++) {
+          const k = ((y * SS + sy) * sw + x * SS + sx) * 4, a = src[k + 3];
+          R += src[k] * a; Gc += src[k + 1] * a; B += src[k + 2] * a; A += a;
+        }
+        const d = (y * W2 + x) * 4;
+        if (A > 0) { o[d] = R / A; o[d + 1] = Gc / A; o[d + 2] = B / A; o[d + 3] = A / (SS * SS); }
+      }
+    } else {
+      const counts = new Map();
+      for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) {
+        counts.clear();
+        let opaque = 0, best = 0, bc = 0;
+        for (let sy = 0; sy < SS; sy++) for (let sx = 0; sx < SS; sx++) {
+          const k = ((y * SS + sy) * sw + x * SS + sx) * 4;
+          if (src[k + 3] < 110) continue;
+          opaque++;
+          const key = ((src[k] >> 3) << 10) | ((src[k + 1] >> 3) << 5) | (src[k + 2] >> 3);
+          const n = (counts.get(key) || 0) + 1;
+          counts.set(key, n);
+          if (n > best) { best = n; bc = k; }
+        }
+        if (opaque < SS * SS * 0.42) continue;
+        const d = (y * W2 + x) * 4;
+        o[d] = src[bc]; o[d + 1] = src[bc + 1]; o[d + 2] = src[bc + 2]; o[d + 3] = 255;
+      }
+      if (ol !== 'px') {
+        // selective outline: darker version of the neighbouring colour
+        const copy = new Uint8ClampedArray(o);
+        for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) {
+          const d = (y * W2 + x) * 4;
+          if (copy[d + 3]) continue;
+          let n = -1;
+          if (x > 0 && copy[d - 1]) n = d - 4; else if (x < W2 - 1 && copy[d + 7]) n = d + 4;
+          else if (y > 0 && copy[d - W2 * 4 + 3]) n = d - W2 * 4; else if (y < H2 - 1 && copy[d + W2 * 4 + 3]) n = d + W2 * 4;
+          if (n < 0) continue;
+          o[d] = copy[n] * 0.42 + 8; o[d + 1] = copy[n + 1] * 0.4 + 6; o[d + 2] = copy[n + 2] * 0.45 + 14; o[d + 3] = 255;
+        }
+      }
+    }
+    cb.putImageData(out, r.x, r.y);
     FR[name] = frames.length;
-    frames.push({ name, x: r.x, y: r.y, w: pw, h: ph, ww, wh, px: pvx, py: pvy });
+    // world size = pixel size (1 world unit = 1 screen-buffer pixel); pivot in the padded frame
+    frames.push({ name, x: r.x, y: r.y, w: W2, h: H2, ww: W2, wh: H2, px: (1 + pvx * pw) / W2, py: (1 + pvy * ph) / H2 });
     return frames.length - 1;
   }
 
@@ -134,8 +170,8 @@
   }
   const ellO = (x, y, rx, ry, c, w = 0.28, rot = 0) => pen.begin().ell(x, y, rx, ry, rot).fill(c).stroke(OL, w);
   const circO = (x, y, r, c, w = 0.28) => pen.begin().arc(x, y, r).fill(c).stroke(OL, w);
-  const eye = (x, y, r = 0.55) => { circ(x, y, r, '#fff'); circ(x + r * 0.25, y, r * 0.55, '#1d1820'); circ(x + r * 0.05, y - r * 0.3, r * 0.2, '#fff'); };
-  const shadowE = (x, y, rx) => ell(x, y, rx, rx * 0.28, 'rgba(0,0,0,0.16)');
+  const eye = (x, y, r = 0.55) => { circ(x + r * 0.15, y, Math.max(0.45, r * 0.75), '#1e1a20'); };
+  const shadowE = () => {};
   // four little legs; f: 0/1 walk, 2 action, 3 lying
   function legs4(x0, x1, top, len, c, w, f) {
     if (f === 3) return;
@@ -469,7 +505,7 @@
   };
 
   // ==================================================================== plants
-  const TREE_COL = { s: ['#5aa04a', '#4a923e', '#68ae54'], a: ['#e08a2a', '#d4602a', '#e8b030'] };
+  const TREE_COL = { s: ['#3f7d3a', '#356f33', '#4c8c40'], a: ['#c87a2a', '#b85a2a', '#d2a032'] };
   function tree(c, snow) {
     return () => {
       shadowE(6, 15, 4.4);
@@ -508,9 +544,9 @@
     frame('pine', 11, 17, 0.5, 16 / 17, () => {
       shadowE(5.5, 16, 3.6);
       box(4.8, 12.5, 1.4, 3.6, '#6a4228');
-      pen.begin().moveTo(0.6, 13).lineTo(5.5, 5.5).lineTo(10.4, 13).close().fill('#2f7a44').stroke(OL, 0.28);
-      pen.begin().moveTo(1.6, 9.6).lineTo(5.5, 2.6).lineTo(9.4, 9.6).close().fill('#3a8a4e').stroke(OL, 0.28);
-      pen.begin().moveTo(2.8, 6.4).lineTo(5.5, 0.4).lineTo(8.2, 6.4).close().fill('#4a9a5a').stroke(OL, 0.28);
+      pen.begin().moveTo(0.6, 13).lineTo(5.5, 5.5).lineTo(10.4, 13).close().fill('#2a6038').stroke(OL, 0.28);
+      pen.begin().moveTo(1.6, 9.6).lineTo(5.5, 2.6).lineTo(9.4, 9.6).close().fill('#326e40').stroke(OL, 0.28);
+      pen.begin().moveTo(2.8, 6.4).lineTo(5.5, 0.4).lineTo(8.2, 6.4).close().fill('#3d7c48').stroke(OL, 0.28);
     }, false, true);
     frame('pineW', 11, 17, 0.5, 16 / 17, () => {
       shadowE(5.5, 16, 3.6);
@@ -525,9 +561,9 @@
     frame('treeburnt', 12, 16, 0.5, 15 / 16, () => {
       line(6, 15, 6, 6, '#3a3430', 1.3); line(6, 10, 3.4, 6.6, '#3a3430', 0.7); line(6, 8.5, 8.8, 5.6, '#3a3430', 0.7);
     }, false, true);
-    frame('bush', 8, 7, 0.5, 6.4 / 7, () => { circO(4, 4, 2.8, '#4a9a40'); circO(2, 5, 1.8, '#3e8a36'); circO(6, 5, 1.8, '#3e8a36'); }, false, 'thin');
+    frame('bush', 8, 7, 0.5, 6.4 / 7, () => { circO(4, 4, 2.8, '#3f8238'); circO(2, 5, 1.8, '#356f30'); circO(6, 5, 1.8, '#356f30'); }, false, 'thin');
     frame('bushB', 8, 7, 0.5, 6.4 / 7, () => {
-      circO(4, 4, 2.8, '#4a9a40'); circO(2, 5, 1.8, '#3e8a36'); circO(6, 5, 1.8, '#3e8a36');
+      circO(4, 4, 2.8, '#3f8238'); circO(2, 5, 1.8, '#356f30'); circO(6, 5, 1.8, '#356f30');
       for (const [bx, by] of [[3, 3], [5, 3.6], [2, 5], [6.2, 5.2], [4, 5.4], [4.4, 2]]) circ(bx, by, 0.55, '#c8284a');
     }, false, 'thin');
     frame('bushW', 8, 7, 0.5, 6.4 / 7, () => { for (let k = 0; k < 5; k++) line(4, 6.4, 1 + k * 1.5, 2.6 + (k % 2), '#7a5a3e', 0.35); ell(4, 3, 2.4, 0.6, '#fbfcff'); }, false, 'thin');
@@ -536,37 +572,36 @@
       line(2, 4.6, 2, 2.2, '#4a9a40', 0.35); ell(1.2, 3.6, 0.6, 0.3, '#5aaa4a');
       for (let k = 0; k < 5; k++) { const a = k * 1.2566; circ(2 + Math.cos(a) * 0.75, 1.6 + Math.sin(a) * 0.75, 0.6, FC[v]); }
       circ(2, 1.6, 0.45, v === 1 ? '#e08a20' : '#f5c518');
-    }, false, false);
-    frame('tuft', 5, 5, 0.5, 4.6 / 5, () => { for (let k = 0; k < 5; k++) line(2.5, 4.6, 0.6 + k * 0.95, 1 + (k % 2) * 1.2, k % 2 ? '#6aae3a' : '#7aba44', 0.4); }, false, false);
-    frame('tuftD', 5, 5, 0.5, 4.6 / 5, () => { for (let k = 0; k < 5; k++) line(2.5, 4.6, 0.6 + k * 0.95, 1 + (k % 2) * 1.2, '#c8b878', 0.4); }, false, false);
+    }, false, 'px');
+    frame('tuft', 5, 5, 0.5, 4.6 / 5, () => { for (let k = 0; k < 5; k++) line(2.5, 4.6, 0.6 + k * 0.95, 1 + (k % 2) * 1.2, k % 2 ? '#6aae3a' : '#7aba44', 0.4); }, false, 'px');
+    frame('tuftD', 5, 5, 0.5, 4.6 / 5, () => { for (let k = 0; k < 5; k++) line(2.5, 4.6, 0.6 + k * 0.95, 1 + (k % 2) * 1.2, '#c8b878', 0.4); }, false, 'px');
     frame('reed', 5, 9, 0.5, 8.6 / 9, () => {
       for (let k = 0; k < 3; k++) { line(1.4 + k * 1.1, 8.6, 1 + k * 1.3, 2 + k, '#5a9a4a', 0.35); }
       rbox(0.6, 1.4, 0.8, 2, 0.4, '#8a5a34'); rbox(3, 2.6, 0.8, 2, 0.4, '#8a5a34');
-    }, false, false);
+    }, false, 'px');
     for (let v = 0; v < 2; v++) frame('rock' + v, 10, 9, 0.5, 6.5 / 9, () => {
-      ell(5, 7.6, 4.6, 1.2, 'rgba(0,0,0,0.16)');
       if (v === 0) { poly([0.6, 7.6, 1.6, 3.2, 4.6, 1.4, 8.4, 2.6, 9.6, 7.4], '#9a968e'); poly([1.6, 3.2, 4.6, 1.4, 8.4, 2.6, 5, 4.4], '#bcb8b0'); }
       else { poly([0.8, 7.6, 2.4, 2.4, 6.4, 1.2, 9.2, 4.6, 9, 7.6], '#908c84'); poly([2.4, 2.4, 6.4, 1.2, 9.2, 4.6, 5.4, 4], '#b4b0a8'); }
     }, false, true);
-    frame('lily', 5, 3, 0.5, 0.5, () => { pen.begin().ell(2.5, 1.5, 2, 1).fill('#5aa04a'); circ(2.6, 1.2, 0.5, '#ffb0c8'); }, false, false);
+    frame('lily', 5, 3, 0.5, 0.5, () => { pen.begin().ell(2.5, 1.5, 2, 1).fill('#5aa04a'); circ(2.6, 1.2, 0.5, '#ffb0c8'); }, false, 'px');
 
     // ------------------------------------------------ fx
-    frame('flame', 8, 8, 0.5, 0.5, () => { soft('rgba(255,240,170,1)', 'rgba(255,90,10,0)', 4, 4, 4); }, false);
-    frame('smoke', 10, 10, 0.5, 0.5, () => { const g = cb.createRadialGradient(5, 5, 0, 5, 5, 4.8); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.7, 'rgba(255,255,255,0.95)'); g.addColorStop(1, 'rgba(255,255,255,0)'); cb.fillStyle = g; cb.beginPath(); cb.arc(5, 5, 4.8, 0, 7); cb.fill(); }, false);
-    frame('spark', 2, 2, 0.5, 0.5, () => { soft('rgba(255,255,255,1)', 'rgba(255,255,255,0)', 1, 1, 1); }, false);
-    frame('dot', 2, 2, 0.5, 0.5, () => { circ(1, 1, 0.8, '#fff'); }, false);
-    frame('chip', 2, 2, 0.5, 0.5, () => { poly([0.2, 1.6, 0.6, 0.3, 1.8, 0.6, 1.6, 1.8], '#fff'); }, false);
-    frame('heal', 4, 4, 0.5, 0.5, () => { box(1.4, 0.3, 1.2, 3.4, '#6dff7a'); box(0.3, 1.4, 3.4, 1.2, '#6dff7a'); }, false);
-    frame('flash', 16, 16, 0.5, 0.5, () => { soft('rgba(255,255,240,1)', 'rgba(255,200,90,0)', 8, 8, 8); }, false);
+    frame('flame', 8, 8, 0.5, 0.5, () => { soft('rgba(255,240,170,1)', 'rgba(255,90,10,0)', 4, 4, 4); }, false, 'px');
+    frame('smoke', 10, 10, 0.5, 0.5, () => { const g = cb.createRadialGradient(5, 5, 0, 5, 5, 4.8); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.7, 'rgba(255,255,255,0.95)'); g.addColorStop(1, 'rgba(255,255,255,0)'); cb.fillStyle = g; cb.beginPath(); cb.arc(5, 5, 4.8, 0, 7); cb.fill(); }, false, 'px');
+    frame('spark', 2, 2, 0.5, 0.5, () => { soft('rgba(255,255,255,1)', 'rgba(255,255,255,0)', 1, 1, 1); }, false, 'px');
+    frame('dot', 2, 2, 0.5, 0.5, () => { circ(1, 1, 0.8, '#fff'); }, false, 'px');
+    frame('chip', 2, 2, 0.5, 0.5, () => { poly([0.2, 1.6, 0.6, 0.3, 1.8, 0.6, 1.6, 1.8], '#fff'); }, false, 'px');
+    frame('heal', 4, 4, 0.5, 0.5, () => { box(1.4, 0.3, 1.2, 3.4, '#6dff7a'); box(0.3, 1.4, 3.4, 1.2, '#6dff7a'); }, false, 'px');
+    frame('flash', 16, 16, 0.5, 0.5, () => { soft('rgba(255,255,240,1)', 'rgba(255,200,90,0)', 8, 8, 8); }, false, 'px');
     frame('ring', 16, 16, 0.5, 0.5, () => { cb.strokeStyle = 'rgba(255,255,255,0.95)'; cb.lineWidth = 0.55; cb.beginPath(); cb.arc(8, 8, 7, 0, Math.PI * 2); cb.stroke(); }, false);
-    frame('white', 1, 1, 0, 0, () => { cb.fillStyle = '#fff'; cb.fillRect(-1, -1, 3, 3); }, false);
-    frame('shadow', 8, 3, 0.5, 0.5, () => { cb.fillStyle = 'rgba(0,0,0,0.3)'; cb.beginPath(); cb.ellipse(4, 1.5, 3.8, 1.3, 0, 0, 7); cb.fill(); }, false);
-    frame('heart', 4, 4, 0.5, 0.5, () => { pen.begin().moveTo(2, 3.6).bez(-0.6, 2, 0.6, -0.2, 2, 1.2).bez(3.4, -0.2, 4.6, 2, 2, 3.6).fill('#ff5a7a'); }, false);
-    frame('zzz', 4, 4, 0.5, 0.5, () => { cb.fillStyle = '#5a5a8a'; cb.font = 'bold 3.6px sans-serif'; cb.fillText('z', 0.6, 3.4); }, false);
-    frame('note', 4, 5, 0.5, 0.5, () => { line(2.8, 0.6, 2.8, 3.6, '#2b2433', 0.4); ell(2.1, 3.8, 0.9, 0.7, '#2b2433'); line(2.8, 0.6, 3.8, 1.4, '#2b2433', 0.4); }, false);
-    frame('cheese', 3, 2.4, 0.5, 0.5, () => { poly([0.2, 2, 2.8, 2, 2.8, 0.4], '#ffd23d', OL, 0.2); circ(2, 1.5, 0.25, '#e0a020'); }, false);
+    frame('white', 1, 1, 0, 0, () => { cb.fillStyle = '#fff'; cb.fillRect(-1, -1, 3, 3); }, false, 'px');
+    frame('shadow', 8, 3, 0.5, 0.5, () => { cb.fillStyle = '#000'; cb.beginPath(); cb.ellipse(4, 1.5, 3.8, 1.3, 0, 0, 7); cb.fill(); }, false, 'px');
+    frame('heart', 4, 4, 0.5, 0.5, () => { pen.begin().moveTo(2, 3.6).bez(-0.6, 2, 0.6, -0.2, 2, 1.2).bez(3.4, -0.2, 4.6, 2, 2, 3.6).fill('#ff5a7a'); }, false, 'px');
+    frame('zzz', 4, 4, 0.5, 0.5, () => { cb.fillStyle = '#5a5a8a'; cb.font = 'bold 3.6px sans-serif'; cb.fillText('z', 0.6, 3.4); }, false, 'px');
+    frame('note', 4, 5, 0.5, 0.5, () => { line(2.8, 0.6, 2.8, 3.6, '#2b2433', 0.4); ell(2.1, 3.8, 0.9, 0.7, '#2b2433'); line(2.8, 0.6, 3.8, 1.4, '#2b2433', 0.4); }, false, 'px');
+    frame('cheese', 3, 2.4, 0.5, 0.5, () => { poly([0.2, 2, 2.8, 2, 2.8, 0.4], '#ffd23d', OL, 0.2); circ(2, 1.5, 0.25, '#e0a020'); }, false, 'px');
     frame('drop', 2, 8, 0.5, 0.5, () => { const g = cb.createLinearGradient(0, 0, 0, 8); g.addColorStop(0, 'rgba(120,160,220,0)'); g.addColorStop(1, 'rgba(120,160,220,0.9)'); cb.fillStyle = g; cb.fillRect(0.7, 0, 0.6, 8); }, false);
-    frame('star', 4, 4, 0.5, 0.5, () => { poly([2, 0, 2.5, 1.5, 4, 2, 2.5, 2.5, 2, 4, 1.5, 2.5, 0, 2, 1.5, 1.5], '#fff6b0'); }, false);
+    frame('star', 4, 4, 0.5, 0.5, () => { poly([2, 0, 2.5, 1.5, 4, 2, 2.5, 2.5, 2, 4, 1.5, 2.5, 0, 2, 1.5, 1.5], '#fff6b0'); }, false, 'px');
     frame('glow', 6, 6, 0.5, 0.5, () => { soft('rgba(230,255,140,1)', 'rgba(180,255,80,0)', 3, 3, 3); }, false);
     frame('scorch', 16, 16, 0.5, 0.5, () => { soft('rgba(110,92,74,0.3)', 'rgba(110,92,74,0)', 8, 8, 8); }, false);
 
@@ -609,7 +644,7 @@
     if (bx1 < bx0) { bx0 = 0; by0 = 0; bx1 = f.w - 1; by1 = f.h - 1; }
     const cw = bx1 - bx0 + 1, ch = by1 - by0 + 1;
     const s2 = Math.min(size / cw, size / ch) * 0.92;
-    ctx.imageSmoothingQuality = 'high';
+    ctx.imageSmoothingEnabled = false;
     ctx.drawImage(t1, bx0, by0, cw, ch, (size - cw * s2) / 2, (size - ch * s2) / 2, cw * s2, ch * s2);
     return c.toDataURL();
   };

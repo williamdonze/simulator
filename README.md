@@ -42,5 +42,5 @@ Il y en a plein. Quelques indices :
 ## Technique
 
 - `js/eco.js` : simulation orientée données (tableaux typés), pas fixe de 30 Hz, grille spatiale avec masques d'espèces par cellule, champs de distance vers l'eau et la forêt, décisions échelonnées.
-- `js/render.js` : WebGL2 instancié, sol procédural (végétation, saisons, neige, eau animée), lumière jour/nuit.
-- `js/sprites.js` : tous les animaux et plantes sont dessinés par code au démarrage (style cartoon avec contour).
+- `js/render.js` : WebGL2 instancié, rendu en basse résolution agrandi sans lissage (pixel art), sol procédural avec transitions tramées entre biomes, eau pixelisée, lumière jour/nuit.
+- `js/sprites.js` : animaux et plantes dessinés par code puis réduits en vrais pixels (couleur dominante, contour d'un pixel teinté).
