@@ -1164,7 +1164,7 @@
       size[i] = sizeOf(t, age[i]) * gsz[i];
       const sleeping = state[i] === ST.SLEEP;
       const running = state[i] === ST.FLEE || state[i] === ST.HUNT;
-      if (u.hunger < 50) en[i] -= DT / (u.hunger * DAY) * metab[i] * (sleeping ? (fl & F.HIBERNATE && season === 3 ? 0.08 : 0.45) : running ? 1.8 : state[i] === ST.REST ? 0.7 : 1) * (season === 3 ? (CACHE[t] ? 0.3 : 1.25) * (1.3 - 0.6 * tCoat[i]) * S.coldK : 1) * (sick[i] > 0 ? 1.3 : 1);
+      if (u.hunger < 50) en[i] -= DT / (u.hunger * DAY) * metab[i] * (sleeping ? (fl & F.HIBERNATE && season === 3 ? 0.035 : 0.45) : running ? 1.8 : state[i] === ST.REST ? 0.7 : 1) * (season === 3 ? (CACHE[t] ? 0.3 : 1.25) * (1.3 - 0.6 * tCoat[i]) * S.coldK : 1) * (sick[i] > 0 ? 1.3 : 1);
       if (u.thirst < 50 && !(sleeping && fl & F.HIBERNATE && season === 3)) wat[i] -= DT / (u.thirst * DAY) * metab[i] * (season === 1 ? 1.3 * (0.8 + 0.4 * tCoat[i]) * S.heatK : 1) * (sleeping ? 0.5 : 1);
       if (S.rain > 0.5 && !(fl & F.AIR)) wat[i] = Math.min(1, wat[i] + DT * 0.01);
       if (sick[i] > 0) {
@@ -1455,7 +1455,7 @@
         chaseT[i] += DT;
         if (chaseT[i] > 14) { state[i] = ST.WANDER; tgt[i] = -1; cd[i] = 3 + rnd() * 3; actT[i] = 0; break; } // the prey never came close
         const l = steerTo(i, x[j], y[j]);
-        if (t === U.heron) { mvs = l > 40 ? 0.45 : 0.12; if (l < 16) { state[i] = ST.HUNT; chaseT[i] = 0; } break; }
+        if (t === U.heron) { mvs = l > 28 ? 0.45 : 0; if (l < 19) { state[i] = ST.HUNT; chaseT[i] = 0; } break; } // approach, then freeze and wait for the fish to pass
         mvs = 0.3;
         if (l < 34) { state[i] = ST.HUNT; chaseT[i] = 0; }
         break;
@@ -1472,7 +1472,7 @@
           if (UHAB[type[j]] === HB.WATER && l < 8) z[i] = 0;
         }
         if (t === U.bear && UHAB[type[j]] === HB.WATER && !TWATER[terr[ci]]) { mvs = 0.6; }
-        if (t === U.heron && l < 14 && cd[i] <= 0) { // spear strike: about one in two succeeds
+        if (t === U.heron && l < 19 && cd[i] <= 0) { // spear strike: about one in two succeeds
           atk[i] = 0.3;
           if (rnd() < 0.5) { const g = SP[type[j]].meat * 2.2; en[i] = Math.min(1, en[i] + g); ateM[i] += g; kills[i]++; recordKill(i, j); die(j, 'eaten', i); state[i] = ST.WANDER; tgt[i] = -1; }
           else { cd[i] = 2 + rnd() * 2; state[i] = ST.WANDER; tgt[i] = -1; }

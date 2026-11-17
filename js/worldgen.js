@@ -185,22 +185,25 @@
     if (chance(0.6)) group('boar', R(3, 10), (tt) => woods(tt) || tt === T.MUD);
     if (fG > 0.35 && chance(0.35)) group('bison', R(4, 12), open);
     if (fW > 0.015 && fF > 0.03 && chance(0.6)) group('beaver', R(2, 4), shore);
-    // predators (rarer: the "predators" setting shifts the odds)
-    const pp = 0.3 + predF * 0.7;
-    if (chance(0.75 * pp)) group('fox', R(2, 5), land);
-    if (chance(0.5 * pp)) group('wolf', R(3, 7), land);
-    if (fF > 0.08 && chance(0.4 * pp)) group('lynx', R(1, 3), woods);
-    if (chance(0.35 * pp)) group('bear', R(1, 2), (tt) => woods(tt) || land(tt));
+    // predators: sized to the prey actually present (roughly 1 wolf per 15–25 large herbivores, 1 fox per 25 small mammals…)
+    const cnt = (k) => { const e = census.find((c) => c[0] === k); return e ? e[1] : 0; };
+    const small = cnt('rabbit') + cnt('mouse') + cnt('squirrel'), big = cnt('deer') + cnt('boar') + cnt('bison');
+    const pp = 0.4 + predF * 1.2; // "predators" setting: rare … many
+    const some = (n) => Math.floor(n * pp + rnd());
+    if (chance(0.8)) group('fox', some(small / 28), land);
+    if (big >= 12 && chance(0.6)) group('wolf', Math.max(2, some(big / 18)), land);
+    if (fF > 0.08 && chance(0.5)) group('lynx', some((small + big) / 45), woods);
+    if (chance(0.35)) group('bear', some(1 + rnd()), (tt) => woods(tt) || land(tt));
     // birds
-    if (chance(0.6 * pp)) group('eagle', R(1, 2), land, true);
-    if (chance(0.7)) group('owl', R(1, 3), woods, true);
-    if (chance(0.4)) group('vulture', R(1, 2), land, true);
+    if (chance(0.6)) group('eagle', some((small + cnt('fish')) / 60), land, true);
+    if (woods && chance(0.75)) group('owl', some(cnt('mouse') / 25 + 0.5), woods, true);
+    if (big >= 8 && chance(0.4)) group('vulture', some(1 + rnd()), land, true);
     if (chance(0.7)) group('crow', R(4, 10), land);
     if (fW > 0.015 && chance(0.85)) group('duck', R(4, 12), (tt) => water(tt) || tt === T.REEDS);
-    if (fW > 0.015 && chance(0.6)) group('heron', R(1, 3), shore);
     // water & insects
     if (fW > 0.008) group('fish', Math.max(4, Math.min(90, Math.round(cntW * 0.025 * (0.5 + rnd())))), water);
     if (fW > 0.008 && chance(0.8)) group('frog', R(5, 15), shore);
+    if (fW > 0.015 && chance(0.6)) group('heron', some((cnt('fish') + cnt('frog')) / 25), shore);
     if (cntFl > 20 && chance(0.85)) group('butterfly', R(6, 14), (tt) => tt === T.FLOWERS);
     if (cntFl > 20 && chance(0.7)) { const n = 1 + ((rnd() * 2) | 0); for (let k = 0; k < n; k++) { const c = findCell((tt) => tt === T.FLOWERS || tt === T.GRASS); if (c >= 0) S.spawn(U.hive, ...cellXY(c)); } }
     S.buildGrid();
