@@ -914,6 +914,7 @@
       if (t === U.boar && (terr[tc(x[i], y[i])] === T.MUD || nearWater(x[i], y[i]))) return 'se vautre dans la boue';
       return HABIT_T[t] || S.STATE_NAMES[s];
     }
+    if (s === ST.EXPLORE && actK[i] === 4) return UDIET[t] & (D.MEAT | D.FISH) ? 'cherche une proie' : 'cherche à manger';
     if (s === ST.EXPLORE) return actK[i] === 2 ? 'cherche son propre territoire' : actK[i] === 1 ? 'rentre sur son territoire' : actK[i] === 3 ? 's\'aventure hors de son territoire' : 'explore son territoire';
     if (s === ST.PLAY && tgt[i] >= 0) return 'joue avec ' + (age[tgt[i]] < SP[t].mature ? 'un frère' : 'sa mère');
     return S.STATE_NAMES[s];
@@ -994,6 +995,12 @@
         if (state[m] === ST.EXPLORE) { goalX[i] = goalX[m] + (rnd() - 0.5) * 24; goalY[i] = goalY[m] + (rnd() - 0.5) * 24; }
         return;
       }
+    }
+    // hungry and nothing in sight: go foraging, further and further, instead of resting
+    if (en[i] < hungerTh[i] && !(fl & F.STATIC) && t !== U.bee) {
+      const far = en[i] < 0.3 ? 1.6 : 1;
+      const p = spotNear(i, t, fl, x[i], y[i], R * 0.4 * far, R * (0.9 + tCur[i] * 0.4) * far);
+      if (p) { setExplore(i, t, p[0], p[1], en[i] < 0.3 ? 3 : 0, 12); actK[i] = 4; return; }
     }
     const season = S.season(), h = S.hour(), hot = season === 1 && h > 11 && h < 16;
     const full = en[i] > 0.85;
@@ -1331,7 +1338,7 @@
         // meander a little: nobody walks in a straight line
         const a = Math.atan2(dY[i], dX[i]) + Math.sin(S.time * 0.9 + i * 1.7) * 0.45;
         dX[i] = Math.cos(a); dY[i] = Math.sin(a);
-        mvs = actK[i] === 2 ? 0.75 : actK[i] === 1 ? 0.6 : 0.42 + tCur[i] * 0.25;
+        mvs = actK[i] === 2 ? 0.75 : actK[i] === 1 || actK[i] === 4 ? 0.6 : 0.42 + tCur[i] * 0.25;
         if (fl & F.AIR && z[i] < UALT[t]) z[i] = Math.min(UALT[t], z[i] + 0.8);
         if (l < 6 || actT[i] <= 0) {
           if (actK[i] === 2 && l < 6) log(i, 's\'installe sur son nouveau territoire');
