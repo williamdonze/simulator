@@ -18,7 +18,7 @@
   G.TERRAIN.forEach((t, i) => { TSPD[i] = t.spd; TBLK[i] = t.block || 0; TWATER[i] = t.water || 0; TGROW[i] = t.grow; TFUEL[i] = t.fuel || 0; TSPREAD[i] = t.spread || 0; });
   G.TBLK = TBLK;
   const S = (G.S = {});
-  const rnd = Math.random;
+  const rnd = G.rand; // central seeded generator (rng.js)
   const U = G.U;
 
   // ---------------------------------------------------------------- per-animal arrays
@@ -55,6 +55,9 @@
   const gauss = () => { let v = 0; for (let k = 0; k < 4; k++) v += rnd(); return (v - 2) * 1.732; }; // ~N(0,1)
   const thirstTh = new Float32Array(MAXU), hungerTh = new Float32Array(MAXU), metab = new Float32Array(MAXU), chron = new Float32Array(MAXU);
   const actT = new Float32Array(MAXU), actK = new Uint8Array(MAXU);
+  // lineage (name of the founding ancestor), remarkable-individual marks, regional modifiers cached per animal
+  const lineage = new Int32Array(MAXU), mark = new Uint8Array(MAXU), zMul = new Float32Array(MAXU).fill(1);
+  S.lineage = lineage; S.mark = mark;
   S.stats = { ateP, ateM, ateH, drank, dist, gen, mom, momName, escapes, klog, homeX, homeY, hRange, tCur, tBold, tSoc, tLazy, tSpd, tSize, tSight, tCoat, tImm, tChr, chron, actK, fatherName, sick, gsz };
   S.GENES = GENES;
   let hw = 0, freeTop = 0;
@@ -190,6 +193,7 @@
     }
     for (let g = 0; g < NG; g++) dadG[i * NG + g] = GENES[g][i];
     fatherName[i] = m >= 0 ? dadN[m] : -1; dadN[i] = -1; sick[i] = 0;
+    lineage[i] = m >= 0 ? lineage[m] : nameI[i]; mark[i] = 0; zMul[i] = 1;
     gsz[i] = 0.88 + 0.24 * tSize[i];
     thirstTh[i] = 0.22 + rnd() * 0.22; hungerTh[i] = 0.48 + rnd() * 0.2;
     // every gene has a price: speed, size, sharp eyes and immunity cost energy
@@ -1717,5 +1721,29 @@
   S.makeRain = function () { S.weather = S.season() === 3 ? 'snow' : 'rain'; S.weatherT = DAY * 0.25; S.weatherStart = S.hour() - 5; };
   S.discoTime = function () { S.disco = 20; };
   S.isLoaded = (i) => loaded[i];
+  // ---------------------------------------------------------------- save / load (used by save.js)
+  const ANIMAL_ARRAYS = { x, y, z, dX, dY, hp, en, wat, age, maxAge, stam, preg, mateCd, cd, hold, chaseT, goalX, goalY, size, store,
+    type, alive, sex, state, vari, ord, loaded, face, tgt, home, nameI, kills, kids, birthT, ateP, ateM, ateH, drank, dist, gen, mom, escapes, momName,
+    homeX, homeY, hRange, settled, tCur, tBold, tSoc, tLazy, tSpd, tSize, tSight, tCoat, tImm, tChr, dadN, fatherName, gsz, sick,
+    thirstTh, hungerTh, metab, chron, actT, actK, lineage, mark, anim };
+  S.exportAnimals = function () {
+    const o = { hw, free: Array.from(freeStack.subarray(0, freeTop)), arrays: {}, dadG: dadG.slice(0, hw * NG), klog: [...klog], names: [...S.names] };
+    for (const k in ANIMAL_ARRAYS) o.arrays[k] = ANIMAL_ARRAYS[k].slice(0, hw);
+    return o;
+  };
+  S.importAnimals = function (o) {
+    alive.fill(0);
+    for (const k in ANIMAL_ARRAYS) if (o.arrays[k]) ANIMAL_ARRAYS[k].set(o.arrays[k]);
+    dadG.set(o.dadG);
+    hw = S.hw = o.hw; freeTop = o.free.length; freeStack.set(o.free); pendingFree.length = 0;
+    for (let i = 0; i < hw; i++) { px[i] = x[i]; py[i] = y[i]; }
+    klog.clear(); for (const [k, v] of o.klog) klog.set(k, v);
+    S.names = new Map(o.names);
+    let n = 0; for (let i = 0; i < hw; i++) if (alive[i]) n++;
+    S.count = n;
+    S.terrDirty = true; S.objDirty = true; S.fieldsDirty = true;
+    S.buildGrid();
+  };
+  S.WORLD_ARRAYS = () => ({ terr, veg, tvar, fireT, bareT, tAge });
   S.setTimeScale = function (k) { TK = k; DT = G.DT * k; };
 })();

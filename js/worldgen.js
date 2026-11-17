@@ -39,6 +39,7 @@
     const S = G.S;
     const seed = opts.seed != null ? opts.seed >>> 0 : (Math.random() * 1e9) >>> 0;
     const rnd = mulberry32(seed);
+    G.setSeed(Math.imul(seed, 2654435761) ^ 0x2545f491); // the simulation that follows is seeded too
     const pick = (v, lo, hi) => (v == null ? lo + rnd() * (hi - lo) : v);
     // climate of this world
     const wet = pick(opts.water, 0, 1), forestF = pick(opts.forest, 0.05, 0.75), predF = pick(opts.predators, 0, 1);
