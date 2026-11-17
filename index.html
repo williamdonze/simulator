@@ -197,6 +197,47 @@
   .rt th { text-align: right; color: var(--muted); font-weight: 600; font-size: 11px; } .rt td { text-align: right; padding: 2px 4px; border-top: 1px solid var(--line); }
   .rt td:first-child, .rt th:first-child { text-align: left; } .rt img.ic { width: 20px; height: 20px; vertical-align: -5px; }
   .rt .up { color: #2a7f3f; } .rt .dn { color: #c0392b; }
+  /* ---- god game */
+  #godBtn.on { background: var(--ink); } #godBtn.on svg { stroke: #fff; }
+  #god { position: fixed; right: 16px; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 76px); width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 220px); overflow: auto; padding: 12px; display: none; z-index: 8; }
+  #god.show { display: block; }
+  #god .gh { display: flex; gap: 8px; align-items: center; } #god .gh b { flex: 1; font-size: 16px; }
+  #god select, #god input[type=range] { font: inherit; font-size: 12px; } #god select { padding: 3px 6px; border-radius: 8px; border: 1px solid var(--line); }
+  .mana { position: relative; height: 18px; background: var(--line); border-radius: 9px; margin: 8px 0 4px; overflow: hidden; }
+  .mana i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #b58cff, #ffcf5a); }
+  .mana span { position: relative; font-size: 11px; padding-left: 8px; line-height: 18px; } .mana .ic { width: 12px; height: 12px; }
+  .gcats { display: flex; flex-wrap: wrap; gap: 3px; margin: 8px 0 6px; }
+  .gcats button { padding: 4px 8px; border-radius: 8px; font-size: 12px; background: var(--line); color: var(--muted); } .gcats button.on { background: var(--ink); color: #fff; }
+  .glist { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .gp { display: flex; align-items: center; gap: 6px; text-align: left; padding: 6px 8px; border-radius: 10px; background: #f6f5f8; font-size: 12px; line-height: 1.15; }
+  .gp .ic { width: 18px; height: 18px; color: #6a4fbf; } .gp span { flex: 1; } .gp small { color: var(--muted); font-size: 10.5px; }
+  .gp.on { background: #ece5ff; box-shadow: inset 0 0 0 2px #6a4fbf; } .gp.dim { opacity: .5; }
+  .gparams { margin-top: 8px; display: grid; gap: 6px; font-size: 12px; }
+  .gparams label { display: flex; align-items: center; gap: 8px; justify-content: space-between; } .gparams label b { min-width: 52px; text-align: right; }
+  .seg { display: flex; background: var(--line); border-radius: 8px; padding: 2px; } .seg button { padding: 2px 10px; border-radius: 6px; font-size: 12px; } .seg button.on { background: var(--panel); }
+  .ghint { color: var(--muted); font-weight: 500; margin: 2px 0 0; } .warn { color: #c0392b; font-style: normal; }
+  #god .go, #gconfirm .go { background: #6a4fbf; color: #fff; padding: 8px 12px; border-radius: 10px; display: flex; gap: 6px; align-items: center; justify-content: center; } #god .go:disabled, #gconfirm .go:disabled { opacity: .45; }
+  #gconfirm { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(max(16px, env(safe-area-inset-bottom)) + 150px); padding: 8px 10px; display: none; gap: 8px; align-items: center; z-index: 9; font-size: 13px; max-width: calc(100vw - 32px); }
+  #gconfirm.show { display: flex; } #gconfirm .ic { width: 18px; height: 18px; color: #6a4fbf; } #gconfirm span { color: var(--muted); font-weight: 500; } #gconfirm .no { padding: 8px 10px; border-radius: 10px; background: var(--line); }
+  #feed { position: fixed; right: 12px; top: calc(max(12px, env(safe-area-inset-top)) + 112px); width: 270px; display: grid; gap: 6px; z-index: 4; pointer-events: none; }
+  .fi { pointer-events: auto; display: flex; gap: 8px; background: rgba(255,255,255,.94); border-radius: 12px; padding: 7px 9px; box-shadow: var(--shadow); font-size: 12px; border-left: 4px solid #8a8494; animation: fin .4s ease; }
+  .fi.go { cursor: pointer; } .fi.go:hover { background: #fff; }
+  .fi .ic { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 2px; color: #6a6474; } .fi img.ic { width: 24px; height: 24px; }
+  .fi b { display: block; font-size: 12.5px; } .fi small { display: block; color: var(--muted); font-size: 10.5px; } .fi span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 500; }
+  .fi.s2 { border-left-color: #4aa8e8; } .fi.s3 { border-left-color: #e0a02a; } .fi.s4 { border-left-color: #e8584a; }
+  @keyframes fin { from { opacity: 0; transform: translateX(20px); } }
+  #insp { position: fixed; left: 16px; top: 60px; width: 290px; max-height: calc(100vh - 230px); overflow: auto; padding: 12px; display: none; z-index: 7; }
+  #insp.show { display: block; }
+  .ih { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; } .ih b { flex: 1; font-size: 15px; } .ih img { width: 36px; height: 36px; } .ih .ic { width: 18px; height: 18px; }
+  #insp .bar { grid-template-columns: 120px 1fr; } .mb { height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; display: block; } .mb em { display: block; height: 100%; }
+  .isp { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; } .isp button { display: flex; align-items: center; gap: 3px; background: var(--line); border-radius: 8px; padding: 2px 7px 2px 2px; font-size: 12px; } .isp img { width: 22px; height: 22px; }
+  .jr .go { cursor: pointer; } .jr .go:hover b { text-decoration: underline; } .jr img { width: 18px; height: 18px; vertical-align: -4px; }
+  #insp p.d { color: var(--muted); font-weight: 500; font-size: 12px; }
+  .chf { display: inline-flex; gap: 2px; margin-left: auto; } .chf button { padding: 2px 8px; border-radius: 7px; font-size: 11.5px; background: var(--panel); color: var(--muted); } .chf button.on { background: var(--ink); color: #fff; }
+  #chron .ce { padding: 3px 0; border-bottom: 1px solid #f3f1f6; } #chron .ce.go { cursor: pointer; } #chron .ce.go:hover { background: #faf9fc; }
+  .ce b.s2 { color: #2a6fb0; } .ce b.s3 { color: #b57400; } .ce b.s4 { color: #c0392b; } .ce em.god { font-style: normal; color: #6a4fbf; font-size: 11px; } .ce small.cons { display: block; color: var(--muted); font-size: 11px; }
+  label.file { position: relative; overflow: hidden; flex: 1; padding: 7px 8px; border-radius: 10px; background: var(--line); font-size: 12px; text-align: center; cursor: pointer; } label.file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  @media (max-width: 680px) { #feed { display: none; } #god { bottom: 140px; max-height: 55vh; } #insp { top: auto; bottom: 200px; left: 8px; } }
   @media (max-width: 680px) { .rsum { grid-template-columns: repeat(2, 1fr); } #skipYears { grid-template-columns: repeat(3, 1fr); } #zoomrow #skipBtn { font-size: 11px; } }
 </style>
 </head>
@@ -226,7 +267,7 @@
 </div>
 
 <div id="toast" class="panel"></div>
-<div id="graph"><div id="gcard" class="panel"><h2><span id="gtabs"><button data-g="pop">Populations</button><button data-g="evo">Évolution</button><button data-g="chron">Chronique</button></span> <button id="graphX" class="x" aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></h2>
+<div id="graph"><div id="gcard" class="panel"><h2><span id="gtabs"><button data-g="pop">Populations</button><button data-g="evo">Évolution</button><button data-g="chron">Chronique</button><button data-g="eco">Écosystème</button></span> <button id="graphX" class="x" aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></h2>
   <canvas id="graphCv"></canvas><div id="chron"></div><div id="legend"></div><p id="gnote"></p></div></div>
 <div id="skip"><div id="scard" class="panel">
   <div id="skipSet"><h2>Voyage dans le temps <button id="skipX" class="x" aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></h2>
@@ -249,12 +290,25 @@
 <div id="err" style="display:none;position:fixed;inset:30% 20px auto;padding:16px;background:#fff;color:#b00;border-radius:12px;text-align:center"></div>
 
 <script src="js/defs.js"></script>
+<script src="js/rng.js"></script>
+<script src="js/bus.js"></script>
 <script src="js/sprites.js"></script>
 <script src="js/eco.js"></script>
+<script src="js/regions.js"></script>
+<script src="js/climate.js"></script>
+<script src="js/events/conditions.js"></script>
+<script src="js/events/registry.js"></script>
+<script src="js/events/chains.js"></script>
+<script src="js/events/director.js"></script>
+<script src="js/migration.js"></script>
+<script src="js/history.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/render.js"></script>
 <script src="js/worldgen.js"></script>
+<script src="js/save.js"></script>
+<script src="js/powers.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/godui.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

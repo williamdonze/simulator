@@ -39,6 +39,7 @@
     const S = G.S;
     const seed = opts.seed != null ? opts.seed >>> 0 : (Math.random() * 1e9) >>> 0;
     const rnd = mulberry32(seed);
+    G.setSeed(Math.imul(seed, 2654435761) ^ 0x2545f491); // the simulation that follows is seeded too
     const pick = (v, lo, hi) => (v == null ? lo + rnd() * (hi - lo) : v);
     // climate of this world
     const wet = pick(opts.water, 0, 1), forestF = pick(opts.forest, 0.05, 0.75), predF = pick(opts.predators, 0, 1);
@@ -59,6 +60,7 @@
     const deepL = lakeShare > 0.04 ? sorted[Math.floor(lakeShare * 0.35 * NCELL)] : -1;
     const rockL = sorted[Math.floor((1 - (0.004 + hilly * 0.05)) * NCELL)];
     const terr = S.terr, veg = S.veg, tAge = S.tAge, tvar = S.tvar;
+    for (let c = 0; c < NCELL; c++) tvar[c] = (rnd() * 256) & 0xf8; // per-cell variety (tree species, lifespan) from the seed
     for (let c = 0; c < NCELL; c++) {
       let tt = T.GRASS;
       const e = E[c], m = M[c];
@@ -212,6 +214,7 @@
     const forestW = fF < 0.08 ? 'très peu de forêt' : fF < 0.25 ? 'quelques bois' : fF < 0.45 ? 'de grandes forêts' : 'une forêt dense';
     const info = { seed, water: fW, forest: fF, grass: fG, census, desc: `${waterW} (${pct(fW)} %), ${forestW} (${pct(fF)} %), ${pct(fG)} % de prairies` };
     S.world = info;
+    G.bus.emit('generated', info);
     S.chronicle('globe', `Monde n° ${seed} : ${info.desc}. Habitants : ${census.map(([k, n]) => `${n} ${n > 1 ? S.plural(U[k]) : G.UNITS[U[k]].name.toLowerCase()}`).join(', ') || 'aucun'}.`);
     return info;
   };

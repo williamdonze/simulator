@@ -18,7 +18,7 @@
   G.TERRAIN.forEach((t, i) => { TSPD[i] = t.spd; TBLK[i] = t.block || 0; TWATER[i] = t.water || 0; TGROW[i] = t.grow; TFUEL[i] = t.fuel || 0; TSPREAD[i] = t.spread || 0; });
   G.TBLK = TBLK;
   const S = (G.S = {});
-  const rnd = Math.random;
+  const rnd = G.rand; // central seeded generator (rng.js)
   const U = G.U;
 
   // ---------------------------------------------------------------- per-animal arrays
@@ -55,6 +55,26 @@
   const gauss = () => { let v = 0; for (let k = 0; k < 4; k++) v += rnd(); return (v - 2) * 1.732; }; // ~N(0,1)
   const thirstTh = new Float32Array(MAXU), hungerTh = new Float32Array(MAXU), metab = new Float32Array(MAXU), chron = new Float32Array(MAXU);
   const actT = new Float32Array(MAXU), actK = new Uint8Array(MAXU);
+  // lineage (name of the founding ancestor), remarkable-individual marks, regional modifiers cached per animal
+  const lineage = new Int32Array(MAXU), mark = new Uint8Array(MAXU), zMul = new Float32Array(MAXU).fill(1);
+  const zMort = new Float32Array(MAXU).fill(1), zFert = new Float32Array(MAXU).fill(1), fertB = new Float32Array(MAXU);
+  // divine zones & selection pressure → per-animal multipliers (refreshed at every decision)
+  function zoneMods(i, t) {
+    let m = 1, mo = 1, fe = 1;
+    const sm = S.spMod[t];
+    if (sm.sel) m *= Math.max(0.4, 1 - sm.sel.k * (GENES[sm.sel.g][i] - 0.5));
+    for (const zz of S.zones) {
+      if (zz.sp >= 0 && zz.sp !== t) continue;
+      if ((x[i] - zz.x) ** 2 + (y[i] - zz.y) ** 2 > zz.r * zz.r) continue;
+      if (zz.kind === 'protect') mo *= 0.15;
+      else if (zz.kind === 'breed') fe *= 2;
+      else if (zz.kind === 'cold') m *= 1 + zz.k * (1.2 - tCoat[i]);
+      else if (zz.kind === 'heat') m *= 1 + zz.k * (0.4 + tCoat[i]);
+      else if (zz.kind === 'mort') mo *= zz.k;
+    }
+    zMul[i] = m; zMort[i] = mo; zFert[i] = fe;
+  }
+  S.lineage = lineage; S.mark = mark;
   S.stats = { ateP, ateM, ateH, drank, dist, gen, mom, momName, escapes, klog, homeX, homeY, hRange, tCur, tBold, tSoc, tLazy, tSpd, tSize, tSight, tCoat, tImm, tChr, chron, actK, fatherName, sick, gsz };
   S.GENES = GENES;
   let hw = 0, freeTop = 0;
@@ -105,7 +125,11 @@
     S.weather = 'clear'; S.weatherT = 0; S.rain = 0; S.snow = 0; S.rainbow = 0; S.lightning = 0;
     S.wind = 0; S.flags = {}; S.maxAnimals = 0; S.lastDay = -1; S.disco = 0;
     // catastrophes, chronicle, statistics
-    S.coldK = 1; S.heatK = 1; S.growK = 1; S.cata = null; S.lastCata = 0; S.restore = null;
+    S.coldK = 1; S.heatK = 1; S.growK = 1; S.rainK = 1; S.fireK = 1; S.cata = null; S.lastCata = 0; S.restore = null;
+    S.spMod = []; for (let t = 0; t < G.NSP; t++) S.spMod.push({ fert: 1, mort: 1, drain: 1, mut: 1, sel: null, extraPrey: 0, until: 0 });
+    S.zones = []; S.fert = new Float32Array(terr.length).fill(1);
+    S.migMem = {}; S.godTemp = 0; S.godWet = 0; S.godRain = 1; S.selK = 1; S.powerCd = {};
+    G.bus.emit('reset', {});
     S.history = []; S.geneHist = []; S.seen = new Uint8Array(G.NSP); S.genRec = new Uint16Array(G.NSP);
     S.tally = { births: new Int32Array(G.NSP), deaths: {} };
     if (S.cataRate == null) S.cataRate = 1;
@@ -184,16 +208,17 @@
     // genes: mid-parent value + segregation noise, rare larger mutations; founders vary around the species mean
     for (let g = 0; g < NG; g++) {
       let v;
-      if (m >= 0) { v = (GENES[g][m] + dadG[m * NG + g]) * 0.5 + gauss() * 0.07; if (rnd() < 0.03) v += gauss() * 0.22; }
+      if (m >= 0) { v = (GENES[g][m] + dadG[m * NG + g]) * 0.5 + gauss() * 0.07; if (rnd() < 0.03 * S.spMod[t].mut) v += gauss() * 0.22; }
       else v = opts && opts.genes ? opts.genes[g] : 0.5 + gauss() * 0.14;
       GENES[g][i] = v < 0 ? 0 : v > 1 ? 1 : v;
     }
     for (let g = 0; g < NG; g++) dadG[i * NG + g] = GENES[g][i];
     fatherName[i] = m >= 0 ? dadN[m] : -1; dadN[i] = -1; sick[i] = 0;
+    lineage[i] = m >= 0 ? lineage[m] : nameI[i]; mark[i] = 0; zMul[i] = 1; zMort[i] = 1; zFert[i] = 1; fertB[i] = 1;
     gsz[i] = 0.88 + 0.24 * tSize[i];
     thirstTh[i] = 0.22 + rnd() * 0.22; hungerTh[i] = 0.48 + rnd() * 0.2;
     // every gene has a price: speed, size, sharp eyes and immunity cost energy
-    metab[i] = (0.93 + rnd() * 0.14) * (0.86 + 0.28 * tSpd[i]) * (0.8 + 0.4 * tSize[i]) * (0.96 + 0.08 * tSight[i]) * (0.96 + 0.08 * tImm[i]);
+    metab[i] = (0.93 + rnd() * 0.14) * (1 + ((0.86 + 0.28 * tSpd[i]) * (0.8 + 0.4 * tSize[i]) * (0.96 + 0.08 * tSight[i]) * (0.96 + 0.08 * tImm[i]) - 1) * (S.selK || 1));
     chron[i] = (tChr[i] - 0.5) * 3;
     homeX[i] = m >= 0 ? homeX[m] : wx; homeY[i] = m >= 0 ? homeY[m] : wy; settled[i] = m >= 0 ? 0 : 1;
     hRange[i] = baseRange(t) * (0.7 + tCur[i] * 0.6);
@@ -216,7 +241,7 @@
   function free(i) { pendingFree.push(i); }
   S.remove = function (i) { if (!alive[i]) return; alive[i] = 0; S.count--; free(i); };
 
-  const CAUSE = { age: 'de vieillesse', hunger: 'de faim', thirst: 'de soif', fire: 'dans un incendie', wound: 'de ses blessures', disease: 'de maladie', flood: 'emporté par la crue' };
+  const CAUSE = { age: 'de vieillesse', hunger: 'de faim', thirst: 'de soif', fire: 'dans un incendie', wound: 'de ses blessures', disease: 'de maladie', flood: 'emporté par la crue', stress: 'd\'épuisement', lava: 'sous la lave', quake: 'dans un séisme', landslide: 'sous un éboulement' };
   function die(i, cause, killer) {
     if (!alive[i]) return;
     const t = type[i];
@@ -306,6 +331,7 @@
             // weak prey first: young, old, injured. Prey hidden in tall grass is harder to spot
             const tt = terr[tc(x[j], y[j])];
             if (tt === T.TALL && d2 > 400) continue;
+            if (zMort[j] < 0.5) continue; // sanctuary
             // out of reach: deep water for waders, open water for land hunters (ducks escape foxes by swimming)
             if (!(UFL[ti] & F.AIR) && !canEnter(ti, tt) && UHAB[type[j]] !== HB.WATER) continue;
             if (UHAB[ti] === HB.LAND && ti !== U.bear && TWATER[tt] && UHAB[type[j]] !== HB.WATER) continue;
@@ -387,6 +413,7 @@
     const yr = dt / (DAY * G.SEASON_DAYS * 4), grow = season === 3 ? 0.15 : season === 1 ? 1.2 : 1.1;
     const seedP = season < 2 ? 0.07 * yr * 4 : 0;   // seeds in spring & summer (rate per tree per year)
     let changed = false, objCh = false;
+    const reg = S.regionOf, rg = S.regGrow, fe = S.fert, feK = yr * 0.4;
     const pioneerP = season < 3 ? 0.006 * yr : 0;
     for (let c = 0, n = terr.length; c < n; c++) {
       const tt = terr[c];
@@ -410,7 +437,8 @@
         else if (tAge[c] > 3 && rnd() < yr * 0.12 && fdist[(((c / TW) | 0) >> 1) * GW + ((c % TW) >> 1)] === 0) { terr[c] = T.FOREST; tAge[c] = 0.6; changed = true; }
       }
       let v = veg[c];
-      v += g * k * (1.05 - v);
+      fe[c] += (1 - fe[c]) * feK; // soil traces (ash, silt, exhaustion) fade over the years
+      v += g * k * (reg ? rg[reg[c]] : 1) * fe[c] * (1.05 - v);
       if (v > 1) v = 1;
       veg[c] = v;
       // overgrazing → bare earth, and recolonisation
@@ -469,7 +497,7 @@
   S.ignite = ignite;
   function updateFire(dt) {
     let n = fireN;
-    const dry = (S.season() === 1 ? 1.6 : 1) * (S.cata && S.cata.kind === 'drought' ? 2 : 1);
+    const dry = (S.season() === 1 ? 1.6 : 1) * (S.fireK || 1);
     for (let k = 0; k < n; k++) {
       const c = fireList[k];
       fireT[c] -= dt * (1 + S.rain * 4);
@@ -504,9 +532,9 @@
     // new day at dawn: decide weather & special events
     if (dayN !== S.lastDay && hour > 5) {
       S.lastDay = dayN;
-      const p = [0.35, 0.22, 0.4, 0.4][season];
+      const p = Math.min(0.95, [0.35, 0.22, 0.4, 0.4][season] * (S.rainK || 1));
       if (rnd() < p) {
-        S.weather = season === 3 ? 'snow' : season === 1 && rnd() < 0.55 ? 'storm' : 'rain';
+        S.weather = (S.temp != null ? S.temp < 1.5 : season === 3) ? 'snow' : season === 1 && rnd() < 0.55 ? 'storm' : 'rain';
         S.weatherT = (0.15 + rnd() * 0.35) * DAY;
         S.weatherStart = 4 + rnd() * 12; // hours after dawn
       } else S.weather = 'clear';
@@ -529,7 +557,7 @@
       const sp = speciesAlive();
       if (dayN >= 6 && sp >= 9 && !S.counts[U.unicorn] && !S.flags['uni' + Math.floor(dayN / YEAR)] && rnd() < 0.02 && (S.flags['uni' + Math.floor(dayN / YEAR)] = 1)) spawnSecret('unicorn', 'u:unicorn|Ton écosystème est si équilibré qu\'une licorne est apparue !');
     }
-    if (S.cata) updateCatastrophe(dt);
+    if (G.director) G.director.tick(dt);
     // weather state machine
     const want = S.weather !== 'clear' && hour > (S.weatherStart || 0) + 5 && S.weatherT > 0;
     if (want) S.weatherT -= dt;
@@ -579,14 +607,19 @@
 
   // ---------------------------------------------------------------- chronicle, genetics history, catastrophes
   const SEASON_N = ['printemps', 'été', 'automne', 'hiver'];
-  function chronicle(icon, text) {
+  function chronicle(icon, text, extra) {
+    if (G.history) return G.history.add(Object.assign({ icon, text }, extra || {}));
     S.history.push({ d: S.time / DAY, icon, text });
-    if (S.history.length > 400) S.history.shift();
   }
   S.chronicle = chronicle;
   const lname = (t) => SP[t].name.toLowerCase();
   const plural = (t) => { const n = lname(t); return /[sxz]$/.test(n) ? n : n.endsWith('eau') ? n + 'x' : n + 's'; };
   S.plural = plural;
+  // grammatical gender of the species (souris, grenouille, abeille are feminine)
+  const FEM = new Set(['mouse', 'frog', 'bee']);
+  S.fem = (t) => FEM.has(SP[t].k);
+  S.e = (t) => (FEM.has(SP[t].k) ? 'e' : '');
+  S.un = (t) => (FEM.has(SP[t].k) ? 'une' : 'un');
   function dailyChronicle(dayN, season) {
     // genetics snapshot: mean of every gene per species, highest generation
     const NS = G.NSP, sum = new Float32Array(NS * NG), n = new Int32Array(NS), gmax = new Uint16Array(NS);
@@ -600,136 +633,153 @@
     for (let t = 0; t < NS; t++) if (n[t]) for (let g = 0; g < NG; g++) sum[t * NG + g] /= n[t];
     if (dayN % 7 === 0) S.geneHist.push({ t: dayN, m: sum, n, g: gmax });
     if (S.geneHist.length > 1200) S.geneHist = S.geneHist.filter((_, k) => k % 2 === 0);
-    // extinctions, comebacks, generation milestones
+    // extinctions, comebacks, generation milestones → published on the bus (history.js writes the chronicle)
     for (let t = 0; t < NS; t++) {
       if (UFL[t] & (F.STATIC | F.HIDDEN) || t === U.bee) continue;
       const c = S.counts[t];
       if (c > 0 && !S.seen[t]) S.seen[t] = 1;
-      else if (c === 0 && S.seen[t] === 1) { S.seen[t] = 2; chronicle('skull', `Les ${plural(t)} ont disparu de la vallée.`); toast(`skull|Les ${plural(t)} ont disparu de la vallée.`); }
-      else if (c > 0 && S.seen[t] === 2) { S.seen[t] = 1; chronicle('u:' + SP[t].k, `Des ${plural(t)} sont revenus dans la vallée.`); }
-      for (const m of [5, 10, 25, 50, 100, 200]) if (gmax[t] >= m && S.genRec[t] < m) { S.genRec[t] = m; if (m >= 10) chronicle('dna', `${m}e génération de ${plural(t)}.`); }
+      else if (c === 0 && S.seen[t] === 1) { S.seen[t] = 2; G.bus.emit('extinction', { t, d: dayN }); }
+      else if (c > 0 && S.seen[t] === 2) { S.seen[t] = 1; G.bus.emit('comeback', { t, d: dayN }); }
+      for (const m of [5, 10, 25, 50, 100, 200]) if (gmax[t] >= m && S.genRec[t] < m) { S.genRec[t] = m; G.bus.emit('generation', { t, g: m }); }
     }
-    // migrants: a locally extinct species can recolonise from outside the valley
+    // migrants from outside the valley (optional): a locally extinct species can come back
     if (S.immigration === true && dayN > 4) for (let t = 0; t < NS; t++) {
       if (S.seen[t] !== 2 || UFL[t] & F.HIDDEN || rnd() > 0.3 / YEAR) continue;
-      const nn = 2 + ((rnd() * 3) | 0), side = (rnd() * 4) | 0;
-      let placed = 0;
-      for (let k = 0; k < 80 && placed < nn; k++) {
-        const r = rnd();
-        const wx = side === 0 ? 6 : side === 1 ? W - 6 : r * W, wy = side === 2 ? 6 : side === 3 ? H - 6 : r * H;
-        const jx = wx + (rnd() - 0.5) * 30, jy = wy + (rnd() - 0.5) * 30;
-        if (okAt(t, jx, jy) || (UFL[t] & F.AIR && inWorld(jx, jy))) { const i = S.spawn(t, jx, jy); if (i >= 0) { placed++; sex[i] = placed & 1; } }
-      }
-      if (placed) { S.seen[t] = 1; chronicle('u:' + SP[t].k, `${placed} ${plural(t)} venus d'ailleurs recolonisent la vallée.`); toast(`u:${SP[t].k}|Des ${plural(t)} venus d'ailleurs arrivent dans la vallée.`); }
+      const placed = S.spawnAtEdge(t, 2 + ((rnd() * 3) | 0));
+      if (placed.length) { S.seen[t] = 1; G.bus.emit('immigration', { t, n: placed.length, x: x[placed[0]], y: y[placed[0]] }); }
     }
-    // catastrophes: rare (roughly one every few years), each tied to its season
-    if (!S.cata && dayN > 20 && dayN - S.lastCata > 120 && rnd() < 0.22 / YEAR * S.cataRate) startCatastrophe(season);
-    // dense populations breed epidemics
-    if (!S.cata && dayN > 20 && dayN - S.lastCata > 60) {
-      for (let t = 0; t < NS; t++) if (!(UFL[t] & (F.STATIC | F.HIDDEN)) && t !== U.bee && S.counts[t] > 120 && rnd() < 0.12 / YEAR * S.cataRate * S.counts[t] / 120) { startCatastrophe(season, 'epidemic', t); break; }
-    }
+    G.bus.emit('day', { d: dayN, season });
   }
-  const CATA = {
-    drought: { icon: 'sun', name: 'Sécheresse', seasons: [1] },
-    fire: { icon: 'flame', name: 'Grand incendie', seasons: [1, 2] },
-    flood: { icon: 'waves', name: 'Inondation', seasons: [0, 2] },
-    storm: { icon: 'wind', name: 'Tempête', seasons: [2, 3] },
-    winter: { icon: 'snow', name: 'Hiver rigoureux', seasons: [3] },
-    epidemic: { icon: 'virus', name: 'Épidémie', seasons: [0, 1, 2, 3] },
+  // a group arriving from beyond the edge of the map (migrants, invaders)
+  S.spawnAtEdge = function (t, n, opts) {
+    const side = (rnd() * 4) | 0, out = [];
+    for (let k = 0; k < 120 && out.length < n; k++) {
+      const r = 0.15 + rnd() * 0.7;
+      const wx = side === 0 ? 8 : side === 1 ? W - 8 : r * W, wy = side === 2 ? 8 : side === 3 ? H - 8 : r * H;
+      const jx = wx + (rnd() - 0.5) * 40, jy = wy + (rnd() - 0.5) * 40;
+      if (okAt(t, jx, jy) || (UFL[t] & F.AIR && inWorld(jx, jy))) { const i = S.spawn(t, jx, jy, opts); if (i >= 0) { out.push(i); sex[i] = out.length & 1; } }
+    }
+    return out;
   };
-  S.CATA = CATA;
-  function startCatastrophe(season, force, ft) {
-    const opts = Object.keys(CATA).filter((k) => CATA[k].seasons.includes(season));
-    const kind = force || opts[(rnd() * opts.length) | 0];
-    const dayN = Math.floor(S.time / DAY);
-    let text = '';
-    S.cata = { kind, t: 0, dur: DAY, cells: null };
-    if (kind === 'drought') {
-      S.cata.dur = DAY * 60; S.growK = 0.25; S.heatK = 1.5;
-      // shallow ponds and stream edges dry out
+
+  // ---------------------------------------------------------------- world effects used by events & divine powers
+  // (cx, cy, rad) limit an effect to an area; rad = 0 means the whole map
+  const inArea = (c, cx, cy, rad) => !rad || (((c % TW) * TC + 4 - cx) ** 2 + (((c / TW) | 0) * TC + 4 - cy) ** 2 < rad * rad);
+  const FX = (S.fxw = {
+    // shallow water dries into mud; returns the list to restore later
+    dryWater(cx, cy, rad, frac = 1) {
       const cells = [];
       for (let c = 0; c < terr.length; c++) {
-        if (terr[c] !== T.WATER && terr[c] !== T.REEDS) continue;
-        const cx = c % TW, cy = (c / TW) | 0;
+        if ((terr[c] !== T.WATER && terr[c] !== T.REEDS) || !inArea(c, cx, cy, rad) || rnd() > frac) continue;
+        const ccx = c % TW, ccy = (c / TW) | 0;
         let land = 0;
-        for (let k = 0; k < 8; k++) { const nx = cx + NX[k], ny = cy + NY[k]; if (nx >= 0 && ny >= 0 && nx < TW && ny < TH && !TWATER[terr[ny * TW + nx]]) land++; }
+        for (let k = 0; k < 8; k++) { const nx = ccx + NX[k], ny = ccy + NY[k]; if (nx >= 0 && ny >= 0 && nx < TW && ny < TH && !TWATER[terr[ny * TW + nx]]) land++; }
         if (land >= 2) cells.push(c, terr[c]);
       }
       for (let k = 0; k < cells.length; k += 2) { terr[cells[k]] = T.MUD; veg[cells[k]] = 0.1; }
-      S.cata.cells = cells;
       for (let i = 0; i < hw; i++) if (alive[i] && UHAB[type[i]] === HB.WATER && !canEnter(type[i], terr[tc(x[i], y[i])])) die(i, 'thirst');
-      text = 'Sécheresse : l\'herbe jaunit, les mares s\'assèchent et les points d\'eau deviennent rares.';
-    } else if (kind === 'fire') {
-      S.cata.dur = DAY * 2; S.wind = 0.4;
-      let lit = 0;
-      for (let k = 0; k < 4000 && lit < 4; k++) { const c = (rnd() * terr.length) | 0; if ((terr[c] === T.FOREST || terr[c] === T.TALL) && veg[c] > 0.2) { ignite(c); lit++; } }
-      text = 'Grand incendie : la foudre est tombée sur une forêt desséchée et le vent attise les flammes.';
-    } else if (kind === 'flood') {
-      S.cata.dur = DAY * 6;
+      FX.dirty();
+      return cells;
+    },
+    restore(cells, only) { for (let k = 0; k + 1 < cells.length; k += 2) { const c = cells[k], tt = cells[k + 1]; if (terr[c] === only && tt < NTT) terr[c] = tt; } FX.dirty(); },
+    // rivers and lakes overflow onto the land next to them
+    flood(cx, cy, rad, passes = 3) {
       const cells = [];
-      for (let pass = 0; pass < 3; pass++) {
+      for (let pass = 0; pass < passes; pass++) {
         const add = [];
         for (let c = 0; c < terr.length; c++) {
-          if (TWATER[terr[c]] || terr[c] === T.ROCK) continue;
-          const cx = c % TW, cy = (c / TW) | 0;
-          for (let k = 0; k < 4; k++) { const nx = cx + NX[k], ny = cy + NY[k]; if (nx >= 0 && ny >= 0 && nx < TW && ny < TH && TWATER[terr[ny * TW + nx]] && terr[ny * TW + nx] !== T.REEDS) { add.push(c); break; } }
+          if (TWATER[terr[c]] || terr[c] === T.ROCK || !inArea(c, cx, cy, rad)) continue;
+          const ccx = c % TW, ccy = (c / TW) | 0;
+          for (let k = 0; k < 4; k++) { const nx = ccx + NX[k], ny = ccy + NY[k]; if (nx >= 0 && ny >= 0 && nx < TW && ny < TH && TWATER[terr[ny * TW + nx]] && terr[ny * TW + nx] !== T.REEDS) { add.push(c); break; } }
         }
         for (const c of add) { cells.push(c, terr[c]); terr[c] = T.WATER; }
       }
-      S.cata.cells = cells;
-      // animals caught by the water: small ones drown, others scramble to dry land
+      const victims = FX.evacuate('flood', 0.6);
+      FX.dirty();
+      return { cells, victims };
+    },
+    // animals standing where they can no longer live: small ones die, others scramble away
+    evacuate(cause, smallDeath) {
+      let v = 0;
       for (let i = 0; i < hw; i++) {
         if (!alive[i] || UFL[type[i]] & (F.AIR | F.STATIC) || canEnter(type[i], terr[tc(x[i], y[i])])) continue;
-        if (UFL[type[i]] & F.SMALL && rnd() < 0.6) { die(i, 'flood'); continue; }
+        if (UFL[type[i]] & F.SMALL && rnd() < smallDeath) { die(i, cause); v++; continue; }
         let ok = false;
         for (let k = 0; k < 40 && !ok; k++) { const a = rnd() * 6.283, d = 10 + k * 3, nx = x[i] + Math.cos(a) * d, ny = y[i] + Math.sin(a) * d; if (okAt(type[i], nx, ny)) { x[i] = px[i] = nx; y[i] = py[i] = ny; ok = true; } }
-        if (!ok) die(i, 'flood');
+        if (!ok) { die(i, cause); v++; }
       }
-      text = 'Inondation : la rivière sort de son lit après des pluies diluviennes.';
-      S.weather = 'rain'; S.weatherT = DAY; S.weatherStart = 0;
-    } else if (kind === 'storm') {
-      S.cata.dur = DAY * 1; S.wind = 1; S.weather = 'storm'; S.weatherT = DAY * 0.5; S.weatherStart = 0;
-      let felled = 0;
-      for (let c = 0; c < terr.length; c++) if (terr[c] === T.FOREST && tAge[c] > 2 && rnd() < 0.05 + tAge[c] * 0.01) { terr[c] = T.GRASS; tvar[c] |= 4; tAge[c] = 0; veg[c] = 0.5; felled++; }
-      text = `Tempête : des rafales violentes ont abattu ${felled} arbres. Les clairières vont se repeupler.`;
-    } else if (kind === 'winter') {
-      S.cata.dur = DAY * 60; S.coldK = 1.7; S.growK = 0.3;
-      S.weather = 'snow'; S.weatherT = DAY * 3; S.weatherStart = 0;
-      text = 'Hiver rigoureux : un froid glacial s\'abat sur la vallée. Seuls les plus robustes passeront l\'hiver.';
-    } else if (kind === 'epidemic') {
-      let t = ft;
-      if (t == null) { let best = 0; for (let k = 0; k < G.NSP; k++) if (!(UFL[k] & (F.STATIC | F.HIDDEN)) && k !== U.bee && S.counts[k] > best) { best = S.counts[k]; t = k; } }
-      if (t == null || S.counts[t] < 6) { S.cata = null; return; }
-      S.cata.dur = DAY * 30; S.cata.sp = t;
+      return v;
+    },
+    ignite(n, cx, cy, rad, kinds) {
+      let lit = 0;
+      for (let k = 0; k < 6000 && lit < n; k++) {
+        const c = (rnd() * terr.length) | 0;
+        if (!inArea(c, cx, cy, rad)) continue;
+        if ((kinds ? kinds.includes(terr[c]) : terr[c] === T.FOREST || terr[c] === T.TALL || terr[c] === T.BUSH) && veg[c] > 0.15) { ignite(c); lit++; }
+      }
+      return lit;
+    },
+    fellTrees(cx, cy, rad, base) {
       let n = 0;
-      for (let i = 0; i < hw; i++) if (alive[i] && type[i] === t && rnd() < 0.35) { sick[i] = 8 + rnd() * 12; n++; log(i, 'est tombé malade'); }
-      text = `Épidémie : une maladie frappe les ${plural(t)}. Ceux qui ont une bonne immunité ont plus de chances de s'en sortir.`;
-    }
-    S.lastCata = dayN;
-    S.cata.text = text;
-    S.objDirty = true; S.terrDirty = true; S.fieldsDirty = true;
-    chronicle(CATA[kind].icon, text);
-    toast(CATA[kind].icon + '|' + text);
-  }
-  S.startCatastrophe = startCatastrophe;
-  function updateCatastrophe(dt) {
-    const c = S.cata;
-    c.t += dt;
-    if (c.t < c.dur) return;
-    if (c.cells) { // water comes back / recedes, leaving fertile silt
-      for (let k = 0; k < c.cells.length; k += 2) { const cc = c.cells[k]; if (c.kind === 'flood' && terr[cc] === T.WATER) { terr[cc] = c.cells[k + 1]; veg[cc] = 1; } else if (c.kind === 'drought' && terr[cc] === T.MUD) terr[cc] = c.cells[k + 1]; }
-    }
-    S.growK = 1; S.coldK = 1; S.heatK = 1; S.wind = 0;
-    if (c.kind === 'epidemic') {
-      let n = 0; for (let i = 0; i < hw; i++) if (alive[i] && sick[i] > 0) n++;
-      if (n) { c.t = c.dur - DAY * 3; return; } // wait for the last sick animal
-      chronicle('virus', `Fin de l'épidémie chez les ${plural(c.sp)} : ${S.counts[c.sp]} survivants.`);
-    }
-    if (c.kind === 'flood') chronicle('waves', 'La crue se retire et laisse un limon fertile.');
-    if (c.kind === 'drought') chronicle('drop', 'La pluie revient enfin : fin de la sécheresse.');
-    S.cata = null;
-    S.objDirty = true; S.terrDirty = true; S.fieldsDirty = true;
-  }
+      for (let c = 0; c < terr.length; c++) if (terr[c] === T.FOREST && tAge[c] > 2 && inArea(c, cx, cy, rad) && rnd() < base + tAge[c] * 0.01) { terr[c] = T.GRASS; tvar[c] |= 4; tAge[c] = 0; veg[c] = 0.5; n++; }
+      FX.dirty();
+      return n;
+    },
+    infect(t, frac, cx, cy, rad) {
+      let n = 0;
+      for (let i = 0; i < hw; i++) if (alive[i] && type[i] === t && sick[i] <= 0 && (!rad || (x[i] - cx) ** 2 + (y[i] - cy) ** 2 < rad * rad) && rnd() < frac) { sick[i] = 8 + rnd() * 12; n++; log(i, 'est tombé malade'); }
+      return n;
+    },
+    sickCount(t) { let n = 0; for (let i = 0; i < hw; i++) if (alive[i] && sick[i] > 0 && (t == null || type[i] === t)) n++; return n; },
+    // hurt / kill the animals around a point (quake, lava, landslide)
+    harm(cx, cy, rad, p, cause) {
+      let n = 0;
+      for (let i = 0; i < hw; i++) {
+        if (!alive[i] || UFL[type[i]] & F.STATIC) continue;
+        const d2 = (x[i] - cx) ** 2 + (y[i] - cy) ** 2;
+        if (d2 > rad * rad) continue;
+        if (UFL[type[i]] & F.AIR) { state[i] = ST.FLEE; dX[i] = (x[i] - cx) || 1; dY[i] = y[i] - cy; norm(i); continue; }
+        if (rnd() < p * (1 - Math.sqrt(d2) / rad * 0.6)) { die(i, cause); n++; }
+        else { hp[i] *= 0.6; state[i] = ST.FLEE; tgt[i] = -1; dX[i] = (x[i] - cx) || 1; dY[i] = y[i] - cy; norm(i); stam[i] = SP[type[i]].stamina || 5; }
+      }
+      return n;
+    },
+    // paint a blob of terrain with a noisy edge
+    blob(cx, cy, rad, tt, keepWater) {
+      const x0 = Math.max(0, ((cx - rad) / TC) | 0), x1 = Math.min(TW - 1, ((cx + rad) / TC) | 0), y0 = Math.max(0, ((cy - rad) / TC) | 0), y1 = Math.min(TH - 1, ((cy + rad) / TC) | 0);
+      let n = 0;
+      for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+        const c = ty * TW + tx, d = Math.hypot(tx * TC + 4 - cx, ty * TC + 4 - cy);
+        if (d > rad * (0.75 + rnd() * 0.25)) continue;
+        if (keepWater && TWATER[terr[c]]) continue;
+        terr[c] = tt; veg[c] = tt === T.BURNT ? 0 : tt === T.FOREST || tt === T.BUSH ? 0.3 : 0.6; fireT[c] = 0; tAge[c] = 0; tvar[c] &= ~7; n++;
+      }
+      FX.dirty();
+      return n;
+    },
+    // a crack: a line of rock and bare earth through the landscape
+    crack(cx, cy, len) {
+      let a = rnd() * 6.283, px0 = cx, py0 = cy, n = 0;
+      for (let k = 0; k < len; k += 3) {
+        a += (rnd() - 0.5) * 0.5; px0 += Math.cos(a) * 3; py0 += Math.sin(a) * 3;
+        if (!inWorld(px0, py0)) break;
+        const c = tc(px0, py0);
+        if (TWATER[terr[c]]) continue;
+        terr[c] = rnd() < 0.35 ? T.ROCK : T.DIRT; veg[c] = 0.05; tAge[c] = 0; n++;
+      }
+      FX.evacuate('wound', 0);
+      FX.dirty();
+      return n;
+    },
+    fertilize(cx, cy, rad, amt) { for (let c = 0; c < terr.length; c++) if (inArea(c, cx, cy, rad)) S.fert[c] = Math.min(2, S.fert[c] + amt); },
+    vegAdd(cx, cy, rad, amt) { for (let c = 0; c < terr.length; c++) if (inArea(c, cx, cy, rad)) veg[c] = Math.max(0, Math.min(1, veg[c] + amt)); S.terrDirty = true; },
+    dirty() { S.objDirty = true; S.terrDirty = true; S.fieldsDirty = true; },
+  });
+  // legacy entry point (old "Catastrophes" tools, older code): delegates to the event director
+  S.startCatastrophe = function (season, kind, sp) {
+    const map = { drought: 'drought', fire: 'wildfire', flood: 'flood', storm: 'storm', winter: 'harshWinter', epidemic: 'epidemic' };
+    return G.director ? G.director.trigger(map[kind] || kind, { sp, source: 'player' }) : null;
+  };
   function speciesAlive() {
     let n = 0;
     for (let t = 0; t < G.NSP; t++) if (S.counts[t] > 0 && !(UFL[t] & (F.STATIC | F.HIDDEN))) n++;
@@ -845,7 +895,7 @@
           if (m >= 0 && state[m] === ST.HUNT && tgt[m] >= 0 && alive[tgt[m]]) { state[i] = ST.HUNT; tgt[i] = tgt[m]; chaseT[i] = chaseT[m]; return; }
         }
         packN = fl & F.PACK ? countNear(i, 90, 1 << t) + 1 : 1;
-        const p = nearest(i, UVIS[t] * (0.8 + 0.4 * tSight[i]), PREY[t], 1);
+        const p = nearest(i, UVIS[t] * (0.8 + 0.4 * tSight[i]), PREY[t] | S.spMod[t].extraPrey, 1);
         if (p >= 0) {
           // keep the same chase going (its clock keeps running): predators give up when it lasts too long
           if ((state[i] === ST.HUNT || state[i] === ST.STALK) && tgt[i] === p) return;
@@ -885,7 +935,7 @@
       // predators only raise young when their territory holds enough prey (numerical response)
       if (PREYPER[t] && preyCount(t) < PREYPER[t] * (S.counts[t] + 1)) { /* not enough food in the valley to raise young */ }
       else {
-      const crowd = countNear(i, fl & F.SMALL ? 72 : 55, 1 << t);
+      const crowd = zFert[i] > 1 ? 0 : countNear(i, fl & F.SMALL ? 72 : 55, 1 << t);
       // solitary predators are territorial: no cubs if the neighbourhood is already full
       if (crowd < (fl & F.AIR && fl & F.HERD ? 20 : fl & F.SMALL ? 14 : u.cat === 'pred' || t === U.beaver ? (countNear(i, fl & F.PACK ? 220 : 160, 1 << t) < (fl & F.PACK ? 8 : 3) ? 9 : 0) : 9)) {
         const m = nearest(i, UVIS[t], 1 << t, 2);
@@ -914,6 +964,8 @@
       if (t === U.boar && (terr[tc(x[i], y[i])] === T.MUD || nearWater(x[i], y[i]))) return 'se vautre dans la boue';
       return HABIT_T[t] || S.STATE_NAMES[s];
     }
+    if (s === ST.EXPLORE && actK[i] === 5) return `migre vers ${G.regions ? G.regions.name(G.regions.at(goalX[i], goalY[i])) : 'un autre territoire'}`;
+    if (s === ST.EXPLORE && actK[i] === 4) return UDIET[t] & (D.MEAT | D.FISH) ? 'cherche une proie' : 'cherche à manger';
     if (s === ST.EXPLORE) return actK[i] === 2 ? 'cherche son propre territoire' : actK[i] === 1 ? 'rentre sur son territoire' : actK[i] === 3 ? 's\'aventure hors de son territoire' : 'explore son territoire';
     if (s === ST.PLAY && tgt[i] >= 0) return 'joue avec ' + (age[tgt[i]] < SP[t].mature ? 'un frère' : 'sa mère');
     return S.STATE_NAMES[s];
@@ -963,6 +1015,16 @@
     setExplore(i, t, p[0], p[1], 2, 60);
     log(i, 'est devenu adulte et quitte sa famille pour fonder son propre territoire');
   }
+  // send an animal to settle elsewhere (collective migrations, colonisation)
+  S.sendTo = function (i, tx, ty, rad, why) {
+    const t = type[i], fl = UFL[t];
+    const p = spotNear(i, t, fl, tx, ty, 0, rad, false);
+    if (!p) return false;
+    homeX[i] = p[0]; homeY[i] = p[1]; settled[i] = 1;
+    setExplore(i, t, p[0], p[1], 5, 110);
+    if (why) log(i, why);
+    return true;
+  };
   function relocate(i, t, fl, why) {
     const R = hRange[i];
     const p = spotNear(i, t, fl, x[i], y[i], R * 0.8, R * 2, true);
@@ -994,6 +1056,12 @@
         if (state[m] === ST.EXPLORE) { goalX[i] = goalX[m] + (rnd() - 0.5) * 24; goalY[i] = goalY[m] + (rnd() - 0.5) * 24; }
         return;
       }
+    }
+    // hungry and nothing in sight: go foraging, further and further, instead of resting
+    if (en[i] < hungerTh[i] && !(fl & F.STATIC) && t !== U.bee) {
+      const far = en[i] < 0.3 ? 1.6 : 1;
+      const p = spotNear(i, t, fl, x[i], y[i], R * 0.4 * far, R * (0.9 + tCur[i] * 0.4) * far);
+      if (p) { setExplore(i, t, p[0], p[1], en[i] < 0.3 ? 3 : 0, 12); actK[i] = 4; return; }
     }
     const season = S.season(), h = S.hour(), hot = season === 1 && h > 11 && h < 16;
     const full = en[i] > 0.85;
@@ -1111,6 +1179,8 @@
   // ---------------------------------------------------------------- per tick
   function bite(i, j) {
     const t = type[i];
+    // protected or favoured prey slip away more often
+    if (rnd() > Math.min(1, S.spMod[type[j]].mort * zMort[j])) { cd[i] = 1; chaseT[i] += 1; return; }
     const dmg = UR[t] * UR[t] * 0.9 * size[i] * (S.season() === 3 ? 0.9 : 1);
     hp[j] -= dmg; flash[j] = 0.12; atk[i] = 0.3; cd[i] = 0.5;
     face[i] = x[j] > x[i] ? 1 : -1;
@@ -1164,7 +1234,7 @@
       size[i] = sizeOf(t, age[i]) * gsz[i];
       const sleeping = state[i] === ST.SLEEP;
       const running = state[i] === ST.FLEE || state[i] === ST.HUNT;
-      if (u.hunger < 50) en[i] -= DT / (u.hunger * DAY) * metab[i] * (sleeping ? (fl & F.HIBERNATE && season === 3 ? 0.035 : 0.45) : running ? 1.8 : state[i] === ST.REST ? 0.7 : 1) * (season === 3 ? (CACHE[t] ? 0.3 : 1.25) * (1.3 - 0.6 * tCoat[i]) * S.coldK : 1) * (sick[i] > 0 ? 1.3 : 1);
+      if (u.hunger < 50) en[i] -= DT / (u.hunger * DAY) * metab[i] * S.spMod[t].drain * zMul[i] * (sleeping ? (fl & F.HIBERNATE && season === 3 ? 0.035 : 0.45) : running ? 1.8 : state[i] === ST.REST ? 0.7 : 1) * (season === 3 ? (CACHE[t] ? 0.3 : 1.25) * (1.3 - 0.6 * tCoat[i]) * S.coldK : 1) * (sick[i] > 0 ? 1.3 : 1);
       if (u.thirst < 50 && !(sleeping && fl & F.HIBERNATE && season === 3)) wat[i] -= DT / (u.thirst * DAY) * metab[i] * (season === 1 ? 1.3 * (0.8 + 0.4 * tCoat[i]) * S.heatK : 1) * (sleeping ? 0.5 : 1);
       if (S.rain > 0.5 && !(fl & F.AIR)) wat[i] = Math.min(1, wat[i] + DT * 0.01);
       if (sick[i] > 0) {
@@ -1179,6 +1249,7 @@
       if (wat[i] <= 0) { wat[i] = 0; hp[i] -= UHP[t] * DT * 0.06; }
       if (age[i] > maxAge[i] && !(fl & F.MAGIC && t !== U.bigfoot && t !== U.unicorn)) { die(i, 'age'); continue; }
       if (hp[i] <= 0) { die(i, en[i] <= 0 ? 'hunger' : wat[i] <= 0 ? 'thirst' : 'wound'); continue; }
+      { const mo = S.spMod[t].mort * zMort[i]; if (mo > 1 && rnd() < (mo - 1) * DT / (DAY * 30)) { die(i, 'stress'); continue; } }
       if (hp[i] < UHP[t] && en[i] > 0.4 && sick[i] <= 0) hp[i] = Math.min(UHP[t], hp[i] + UHP[t] * DT * 0.01);
       if (mateCd[i] > 0) mateCd[i] -= DT / DAY;
       if (cd[i] > 0) cd[i] -= DT;
@@ -1194,6 +1265,7 @@
       }
       // -------------------------------------------- decide
       if (((tick + i) % 6) === 0 || (tgt[i] >= 0 && !alive[tgt[i]])) {
+        zoneMods(i, t);
         if (tgt[i] >= 0 && !alive[tgt[i]]) { tgt[i] = -1; if (state[i] !== ST.SLEEP) state[i] = ST.WANDER; }
         decide(i, t);
       }
@@ -1210,6 +1282,7 @@
     const u = SP[t];
     let n = u.litter[0] + ((rnd() * (u.litter[1] - u.litter[0] + 1)) | 0);
     if (en[i] < 0.4) n = Math.max(1, n >> 1);
+    if (fertB[i] > 1) n = Math.round(n * Math.min(2.5, fertB[i]));
     let golden = false;
     for (let k = 0; k < n; k++) {
       const a = rnd() * 6.283;
@@ -1331,10 +1404,10 @@
         // meander a little: nobody walks in a straight line
         const a = Math.atan2(dY[i], dX[i]) + Math.sin(S.time * 0.9 + i * 1.7) * 0.45;
         dX[i] = Math.cos(a); dY[i] = Math.sin(a);
-        mvs = actK[i] === 2 ? 0.75 : actK[i] === 1 ? 0.6 : 0.42 + tCur[i] * 0.25;
+        mvs = actK[i] === 2 || actK[i] === 5 ? 0.75 : actK[i] === 1 || actK[i] === 4 ? 0.6 : 0.42 + tCur[i] * 0.25;
         if (fl & F.AIR && z[i] < UALT[t]) z[i] = Math.min(UALT[t], z[i] + 0.8);
         if (l < 6 || actT[i] <= 0) {
-          if (actK[i] === 2 && l < 6) log(i, 's\'installe sur son nouveau territoire');
+          if ((actK[i] === 2 || actK[i] === 5) && l < 6) log(i, 's\'installe sur son nouveau territoire');
           state[i] = ST.WANDER; actT[i] = 0; actK[i] = 0;
         }
         break;
@@ -1510,6 +1583,9 @@
         mvs = 0.6;
         if (l < UR[t] * 2 + 3) {
           const f = sex[i] === 0 ? i : j, mm = f === i ? j : i;
+          const fz = S.spMod[t].fert * zFert[f];
+          if (rnd() > fz) { mateCd[i] = mateCd[j] = 3; state[i] = state[j] = ST.WANDER; tgt[i] = tgt[j] = -1; break; } // no conception (stress, crowding, inbreeding…)
+          fertB[f] = fz;
           for (let g = 0; g < NG; g++) dadG[f * NG + g] = GENES[g][mm];
           dadN[f] = nameI[mm];
           preg[f] = SP[t].gest; mateCd[f] = SP[t].bcd || SP[t].gest * 1.2 + 0.3; mateCd[mm] = Math.min(mateCd[f], SP[t].gest * 0.5 + 0.5);
@@ -1681,6 +1757,7 @@
       if (terr[c] === tt) continue;
       terr[c] = tt; veg[c] = 0.9; fireT[c] = 0; tvar[c] &= ~7; bareT[c] = 0;
       tAge[c] = tt === T.FOREST ? 2.5 + rnd() * 6 : tt === T.BUSH ? 1 + rnd() * 3 : 0;
+      if (S.basin) S.basin[c] = TWATER[tt] ? 1 : S.basin[c];
     }
     S.terrDirty = true; S.objDirty = true; S.fieldsDirty = true;
     // animals that can't live there anymore move out (or die if stuck)
@@ -1710,5 +1787,29 @@
   S.makeRain = function () { S.weather = S.season() === 3 ? 'snow' : 'rain'; S.weatherT = DAY * 0.25; S.weatherStart = S.hour() - 5; };
   S.discoTime = function () { S.disco = 20; };
   S.isLoaded = (i) => loaded[i];
+  // ---------------------------------------------------------------- save / load (used by save.js)
+  const ANIMAL_ARRAYS = { x, y, z, dX, dY, hp, en, wat, age, maxAge, stam, preg, mateCd, cd, hold, chaseT, goalX, goalY, size, store,
+    type, alive, sex, state, vari, ord, loaded, face, tgt, home, nameI, kills, kids, birthT, ateP, ateM, ateH, drank, dist, gen, mom, escapes, momName,
+    homeX, homeY, hRange, settled, tCur, tBold, tSoc, tLazy, tSpd, tSize, tSight, tCoat, tImm, tChr, dadN, fatherName, gsz, sick,
+    thirstTh, hungerTh, metab, chron, actT, actK, lineage, mark, anim };
+  S.exportAnimals = function () {
+    const o = { hw, free: Array.from(freeStack.subarray(0, freeTop)), arrays: {}, dadG: dadG.slice(0, hw * NG), klog: [...klog], names: [...S.names] };
+    for (const k in ANIMAL_ARRAYS) o.arrays[k] = ANIMAL_ARRAYS[k].slice(0, hw);
+    return o;
+  };
+  S.importAnimals = function (o) {
+    alive.fill(0);
+    for (const k in ANIMAL_ARRAYS) if (o.arrays[k]) ANIMAL_ARRAYS[k].set(o.arrays[k]);
+    dadG.set(o.dadG);
+    hw = S.hw = o.hw; freeTop = o.free.length; freeStack.set(o.free); pendingFree.length = 0;
+    for (let i = 0; i < hw; i++) { px[i] = x[i]; py[i] = y[i]; }
+    klog.clear(); for (const [k, v] of o.klog) klog.set(k, v);
+    S.names = new Map(o.names);
+    let n = 0; for (let i = 0; i < hw; i++) if (alive[i]) n++;
+    S.count = n;
+    S.terrDirty = true; S.objDirty = true; S.fieldsDirty = true;
+    S.buildGrid();
+  };
+  S.WORLD_ARRAYS = () => ({ terr, veg, tvar, fireT, bareT, tAge });
   S.setTimeScale = function (k) { TK = k; DT = G.DT * k; };
 })();
