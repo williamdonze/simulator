@@ -12,12 +12,11 @@
     document.getElementById('err').style.display = 'block';
     throw err;
   }
-  G.initWorld(2400, 1344);
+  G.initWorld(...ui.worldForScreen());
   R.initWorld();
   ui.init();
   R.resize();
   ui.fitCamera();
-  window.addEventListener('resize', () => { R.resize(); });
 
   let last = performance.now(), acc = 0, simMs = 0;
   function frame(now) {
@@ -46,7 +45,7 @@
     }
     const alpha = S.phase === 'battle' && ui.running ? Math.min(1, acc / G.DT) : 1;
     R.draw(alpha, dt, simDt);
-    ui.update(now, dt * 1000, simMs);
+    ui.update();
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

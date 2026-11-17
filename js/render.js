@@ -90,39 +90,38 @@
   float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
     return mix(mix(h21(i), h21(i+vec2(1,0)), f.x), mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), f.x), f.y); }
+  vec4 samp(vec2 w) {
+    vec2 ts = vec2(textureSize(uTerr, 0));
+    vec2 warp = vec2(vn(w * 0.09), vn(w * 0.09 + 17.3)) - 0.5;
+    vec2 p = w / uWorld * ts - 0.5 + warp * 1.0;
+    vec2 fp = smoothstep(0.42, 0.58, fract(p));
+    return texture(uTerr, (floor(p) + fp + 0.5) / ts);
+  }
   void main(){
     vec2 w = vW;
     if (w.x < 0.0 || w.y < 0.0 || w.x > uWorld.x || w.y > uWorld.y) {
       float e = max(max(-w.x, w.x - uWorld.x), max(-w.y, w.y - uWorld.y));
-      o = vec4(mix(vec3(0.19,0.24,0.16), vec3(0.11,0.13,0.10), clamp(e/60.0,0.0,1.0)), 1.0); return;
+      o = vec4(0.965, 0.965, 0.94, 1.0); return;
     }
     vec2 uv = w / uWorld;
-    // organic, crisp terrain borders: warp the lookup with noise, then sharpen the bilinear blend
-    vec2 ts = vec2(textureSize(uTerr, 0));
-    vec2 warp = vec2(vn(w * 0.11), vn(w * 0.11 + 17.3)) - 0.5;
-    vec2 p = w / uWorld * ts - 0.5 + warp * 1.1;
-    vec2 fp = fract(p);
-    fp = smoothstep(0.32, 0.68, fp);
-    vec4 t = texture(uTerr, (floor(p) + fp + 0.5) / ts);
+    vec4 t = samp(w);
     vec3 c = t.rgb;
-    float n = vn(w * 0.035) * 0.55 + vn(w * 0.16) * 0.3 + h21(floor(w * 0.9)) * 0.15;
-    c *= 0.88 + n * 0.24;
+    // cartoon border line between terrain types
+    vec3 cx = samp(w + vec2(1.6, 0.0)).rgb, cy = samp(w + vec2(0.0, 1.6)).rgb;
+    float ed = max(length(c - cx), length(c - cy));
     float wa = t.a;
     if (wa > 0.01) {
-      float r1 = sin(w.x * 0.08 + uTime * 1.5 + sin(w.y * 0.045 + uTime * 0.7) * 2.5) * 0.5 + 0.5;
-      float r2 = sin(w.y * 0.12 - uTime * 1.1 + w.x * 0.03) * 0.5 + 0.5;
-      c = mix(c, c * 0.92 + vec3(0.03,0.05,0.08), wa);
-      c += wa * pow(r1 * r2, 4.0) * 0.35;
+      float r1 = sin(w.x * 0.07 + uTime * 1.3 + sin(w.y * 0.04 + uTime * 0.6) * 2.5);
+      float r2 = sin(w.y * 0.09 - uTime * 0.9 + w.x * 0.02);
+      c += wa * smoothstep(0.93, 0.99, r1 * 0.5 + 0.5) * smoothstep(0.2, 0.9, r2 * 0.5 + 0.5) * 0.35;
     }
+    c = mix(c, c * 0.62, smoothstep(0.05, 0.14, ed));
     vec4 d = texture(uDecal, vec2(uv.x, 1.0 - uv.y));
     c = c * (1.0 - d.a) + d.rgb;
-    // border vignette
-    vec2 e = min(w, uWorld - w);
-    c *= 0.82 + 0.18 * clamp(min(e.x, e.y) / 40.0, 0.0, 1.0);
     if (uMid > 0.0) {
       float dm = abs(w.x - uWorld.x * 0.5) * uZoom;
       float dash = step(mod(w.y, 26.0), 15.0);
-      c = mix(c, vec3(1.0), uMid * dash * (1.0 - smoothstep(0.8, 2.0, dm)) * 0.7);
+      c = mix(c, vec3(0.55, 0.55, 0.6), uMid * dash * (1.0 - smoothstep(0.6, 1.8, dm)) * 0.8);
     }
     o = vec4(c, 1.0);
   }`;
@@ -251,7 +250,7 @@
     for (let c = 0, n = terr.length; c < n; c++) {
       const tt = terr[c];
       const col = TER[tt].col;
-      const v = ((tvar[c] >> 2) - 32) / 32 * (tt === T.GRASS ? 0.018 : 0.05) + 1;
+      const v = ((tvar[c] >> 2) - 32) / 32 * (tt === T.GRASS ? 0 : 0.025) + 1;
       let r = col[0] * v, g = col[1] * v, b = col[2] * v;
       if (fire[c] > 0) { r = r * 0.4 + 200; g = g * 0.4 + 70; b = b * 0.3 + 10; }
       const o = c * 4;
@@ -298,7 +297,7 @@
   }
   const MISC_TEAM = (255 << 24) >>> 0;              // flash 0 dark 0 mode 0 alpha 255
   const MISC_MULT = ((255 << 24) | (1 << 16)) >>> 0;
-  const MISC_ADD = ((255 << 24) | (2 << 16)) >>> 0;
+  const MISC_ADD = ((255 << 24) | (1 << 16)) >>> 0; // light cartoon ground: no additive blending
   function misc(flash, dark, mode, alpha) { return ((flash & 255) | ((dark & 255) << 8) | ((mode & 255) << 16) | ((alpha & 255) << 24)) >>> 0; }
   R.misc = misc;
   function rgba(r, g, b, a) { return ((r & 255) | ((g & 255) << 8) | ((b & 255) << 16) | ((a & 255) << 24)) >>> 0; }
@@ -372,15 +371,17 @@
     budget: 1,
     decal(f, x, y, w, h, rot, col, m) { if (decalQ.length < 8 * 6000) decalQ.push(f, x, y, w, h, rot, col, m == null ? MISC_MULT : m); },
     corpse(j) {
-      const S = G.S, t = S.type[j];
-      const f = G.unitFrames[t * 3];
-      const side = rnd() < 0.5 ? -1 : 1;
-      const w = R.fw[f] * S.face[j], h = R.fh[f];
-      decalQ.push(f, S.x[j], S.y[j] - 2, w, h, side * (1.35 + rnd() * 0.4), TEAMC[S.team[j]], misc(0, 70, 0, 235));
-      if (rnd() < 0.7) decalQ.push(G.FR.splat, S.x[j] + (rnd() - 0.5) * 4, S.y[j], 6 + rnd() * 4, 4 + rnd() * 3, rnd() * 6, 0xffffffff, MISC_MULT);
+      // cartoon "poof": the fallen unit vanishes in a puff of white smoke
+      const S = G.S, x = S.x[j], y = S.y[j] - 6;
+      if (nfx > MAXFX * 0.85) return;
+      const n = nfx > MAXFX * 0.5 ? 2 : 4;
+      for (let k = 0; k < n; k++) {
+        const a = rnd() * 6.28;
+        P_(G.FR.smoke, x + Math.cos(a) * 3, y + Math.sin(a) * 2, 0, Math.cos(a) * 14, Math.sin(a) * 8, 8 + rnd() * 8, 0.35 + rnd() * 0.25, 3, 8, 0xf0ffffff, 0);
+      }
     },
     blood(x, y, n) {
-      if (nfx > MAXFX * 0.8) return;
+      if (nfx > MAXFX * 0.8 || rnd() < 0.6) return;
       for (let k = 0; k < n; k++) P_(G.FR.dot, x, y, 6, (rnd() - 0.5) * 40, (rnd() - 0.5) * 20, 20 + rnd() * 40, 0.5 + rnd() * 0.3, 1.2, 0.8, 0xff1010a0, 2 | 16);
     },
     spark(x, y, n) {
@@ -391,12 +392,12 @@
       for (let k = 0; k < n; k++) P_(G.FR.smoke, x + (rnd() - 0.5) * 8, y + (rnd() - 0.5) * 4, 1, (rnd() - 0.5) * 25, (rnd() - 0.5) * 10, 6 + rnd() * 8, 0.8 + rnd() * 0.6, 4, 9, 0x70a0c0d0, 0);
     },
     smokePuff(x, y, n) {
-      for (let k = 0; k < n; k++) P_(G.FR.smoke, x + (rnd() - 0.5) * 6, y - 4 + (rnd() - 0.5) * 6, 2, (rnd() - 0.5) * 30, (rnd() - 0.5) * 20, 10 + rnd() * 10, 0.6 + rnd() * 0.4, 6, 12, 0xc0303030, 0);
+      for (let k = 0; k < n; k++) P_(G.FR.smoke, x + (rnd() - 0.5) * 6, y - 4 + (rnd() - 0.5) * 6, 2, (rnd() - 0.5) * 30, (rnd() - 0.5) * 20, 10 + rnd() * 10, 0.6 + rnd() * 0.4, 6, 12, 0xd0e0e0e0, 0);
     },
     heal(x, y) { P_(G.FR.heal, x + (rnd() - 0.5) * 6, y, 2, 0, 0, 18, 0.8, 3, 3, 0xffffffff, 0); },
     tracer(x0, y0, x1, y1) {
       const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy);
-      const i = P_(G.FR.tracer, (x0 + x1) / 2, (y0 + y1) / 2, 0, 0, 0, 0, 0.08, l, 1.2, 0xb0ffffff, 1 | 4);
+      const i = P_(G.FR.tracer, (x0 + x1) / 2, (y0 + y1) / 2, 0, 0, 0, 0, 0.08, l, 1.2, 0xc04a7a9a, 1 | 4);
       if (i >= 0) fxRot[i] = Math.atan2(dy, dx);
     },
     muzzle(x, y, face, s = 1) {
@@ -405,16 +406,16 @@
     },
     explosion(x, y, R, fire) {
       P_(G.FR.flash, x, y, 2, 0, 0, 0, 0.22, R * 1.6, R * 2.6, 0xff50c0ff, 1);
-      P_(G.FR.ring, x, y, 0, 0, 0, 0, 0.25, R * 0.6, R * 2.2, 0x5080d0ff, 1);
+      P_(G.FR.ring, x, y, 0, 0, 0, 0, 0.25, R * 0.6, R * 2.2, 0x70303a50, 0);
       const dense = nfx < MAXFX * 0.6;
       const n = dense ? Math.min(14, 4 + R / 5) : 2;
       for (let k = 0; k < n; k++) {
         const a = rnd() * 6.28, s = rnd() * R * 0.6;
-        if (k < n * 0.6) P_(G.FR.smoke, x + Math.cos(a) * s, y + Math.sin(a) * s * 0.6, 2, Math.cos(a) * 20, Math.sin(a) * 12, 14 + rnd() * 18, 0.7 + rnd() * 0.8, R * 0.3, R * 0.75, fire ? 0x70485868 : 0x70788088, 0);
+        if (k < n * 0.6) P_(G.FR.smoke, x + Math.cos(a) * s, y + Math.sin(a) * s * 0.6, 2, Math.cos(a) * 20, Math.sin(a) * 12, 14 + rnd() * 18, 0.7 + rnd() * 0.8, R * 0.3, R * 0.75, fire ? 0xa0c8ccd4 : 0xa0dcdcdc, 0);
         P_(G.FR.flame, x + Math.cos(a) * s * 0.6, y + Math.sin(a) * s * 0.4, 3, Math.cos(a) * 30, Math.sin(a) * 18, 20 + rnd() * 20, 0.25 + rnd() * 0.25, R * 0.3, R * 0.6, 0xff2080ff, 1);
       }
       if (dense) for (let k = 0; k < n; k++) P_(G.FR.chip, x, y, 3, (rnd() - 0.5) * R * 6, (rnd() - 0.5) * R * 3, 40 + rnd() * 70, 0.6 + rnd() * 0.4, 1.4, 1.4, 0xff304050, 2);
-      fx.decal(G.FR.scorch, x, y, R * 1.8, R * 1.3, rnd() * 6, 0xffffffff);
+      if (rnd() < 0.35) fx.decal(G.FR.scorch, x, y, R * 1.2, R * 0.85, rnd() * 6, 0x60ffffff);
       G.shake = Math.min(8, (G.shake || 0) + R * 0.04);
     },
     debris(x, y, col, n = 5) {
@@ -424,7 +425,7 @@
     burst(x, y, r, n) {
       for (let k = 0; k < n; k++) {
         const a = rnd() * 6.28, s = rnd() * r;
-        P_(G.FR.smoke, x + Math.cos(a) * s, y + Math.sin(a) * s * 0.6, 4, Math.cos(a) * 15, Math.sin(a) * 8, 10 + rnd() * 20, 1.4 + rnd(), r * 0.3, r * 0.8, 0xa0707880, 0);
+        P_(G.FR.smoke, x + Math.cos(a) * s, y + Math.sin(a) * s * 0.6, 4, Math.cos(a) * 15, Math.sin(a) * 8, 10 + rnd() * 20, 1.4 + rnd(), r * 0.3, r * 0.8, 0xb0d8d8d8, 0);
         P_(G.FR.chip, x + Math.cos(a) * s, y, r * 0.5, (rnd() - 0.5) * 80, (rnd() - 0.5) * 30, 40 + rnd() * 60, 0.8, 2, 2, 0xff5a6a7a, 2);
       }
     },
@@ -432,7 +433,7 @@
       if (nfx > MAXFX * 0.75) return;
       const big = tt === T.FOREST || tt === T.PALI;
       P_(G.FR.flame, x + (rnd() - 0.5) * 6, y + (rnd() - 0.5) * 6, big ? 6 : 2, (rnd() - 0.5) * 6, 0, 14 + rnd() * 16, 0.4 + rnd() * 0.4, big ? 6 : 4, 1.5, 0xff2a8cff, 1);
-      if (rnd() < 0.25) P_(G.FR.smoke, x, y, big ? 12 : 5, (rnd() - 0.5) * 6 + G.S.wind * 20, 0, 14 + rnd() * 10, 1.6 + rnd(), 4, 14, 0x60404040, 0);
+      if (rnd() < 0.25) P_(G.FR.smoke, x, y, big ? 12 : 5, (rnd() - 0.5) * 6 + G.S.wind * 20, 0, 14 + rnd() * 10, 1.6 + rnd(), 4, 14, 0x80d0d0d0, 0);
     },
     unitFire(x, y) {
       if (nfx > MAXFX * 0.8) return;
@@ -442,7 +443,7 @@
       if (nfx > MAXFX * 0.8) return;
       const ox = (rnd() - 0.5) * r * 1.6;
       P_(G.FR.flame, x + ox, y, r * (0.4 + rnd() * 0.8), (rnd() - 0.5) * 6, 0, 18 + rnd() * 14, 0.5 + rnd() * 0.3, r * 0.35, r * 0.1, 0xff2a8cff, 1);
-      if (rnd() < 0.3) P_(G.FR.smoke, x + ox, y, r, (rnd() - 0.5) * 6, 0, 20, 2, r * 0.3, r * 1.1, 0x70303030, 0);
+      if (rnd() < 0.3) P_(G.FR.smoke, x + ox, y, r, (rnd() - 0.5) * 6, 0, 20, 2, r * 0.3, r * 1.1, 0x90d0d0d0, 0);
     },
   });
 
@@ -451,7 +452,7 @@
     for (let i = 0; i < n; i++) {
       fxL[i] -= dt;
       if (fxL[i] <= 0) {
-        if (fxFl[i] & 16 && fxZ[i] <= 0.5) fx.decal(G.FR.dot, fxX[i], fxY[i], 1.3, 0.9, 0, 0xc01010a0);
+        
         n--;
         fxX[i] = fxX[n]; fxY[i] = fxY[n]; fxZ[i] = fxZ[n]; fxVX[i] = fxVX[n]; fxVY[i] = fxVY[n]; fxVZ[i] = fxVZ[n];
         fxL[i] = fxL[n]; fxM[i] = fxM[n]; fxS0[i] = fxS0[n]; fxS1[i] = fxS1[n]; fxC[i] = fxC[n]; fxFl[i] = fxFl[n];
@@ -636,7 +637,7 @@
     // brush preview & selection ring
     if (G.ui && G.ui.brushPreview) {
       const b = G.ui.brushPreview;
-      put(b.x, b.y, b.r * 2 / 0.875, b.r * 2 / 0.875, 0, FR.ring, b.col, MISC_ADD, 0);
+      put(b.x, b.y, b.r * 2 / 0.875, b.r * 2 / 0.875, 0, FR.ring, b.col, MISC_MULT, 0);
     }
     passes.push([at, flushPlain(start, at)]); at += ni - start;
 

@@ -40,20 +40,20 @@ const P = (G.P = { NONE: 0, ARROW: 1, BOLT: 2, BULLET: 3, GRENADE: 4, FIREBALL: 
 // block: 0 = walkable, 1 = solid (blocks units & straight shots), 2 = blocks units only
 const T = (G.T = {});
 G.TERRAIN = [
-  { k: 'GRASS',    name: 'Prairie',        col: [112, 170, 78],  spd: 1.0,  block: 0, fuel: 0,   spread: 0 },
-  { k: 'TALL',     name: 'Herbes hautes',  col: [148, 168, 62],  spd: 0.85, block: 0, fuel: 2.2, spread: 1.6, tool: true, desc: 'Très inflammable : le feu s\'y propage à toute vitesse.' },
-  { k: 'FOREST',   name: 'Forêt',          col: [70, 120, 54],   spd: 0.55, block: 0, fuel: 9,   spread: 0.45, tool: true, desc: 'Ralentit les troupes, arrête 35 % des tirs tendus. Brûle longtemps.' },
-  { k: 'WATER',    name: 'Eau peu profonde', col: [74, 146, 206], spd: 0.45, block: 0, fuel: 0,  spread: 0, water: 1, tool: true, desc: 'Ralentit fortement et éteint les unités en feu.' },
-  { k: 'DEEP',     name: 'Eau profonde',   col: [40, 96, 170],   spd: 0.3,  block: 2, fuel: 0,   spread: 0, water: 1, tool: true, desc: 'Infranchissable à pied. Les projectiles passent au-dessus.' },
-  { k: 'MUD',      name: 'Boue',           col: [118, 92, 60],   spd: 0.45, block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Englue les troupes, surtout la cavalerie.' },
-  { k: 'SAND',     name: 'Sable',          col: [222, 200, 140], spd: 0.8,  block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Léger ralentissement.' },
-  { k: 'ROAD',     name: 'Route',          col: [176, 156, 120], spd: 1.4,  block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Les troupes y marchent 40 % plus vite.' },
-  { k: 'ROCK',     name: 'Rochers',        col: [120, 118, 110], spd: 0,    block: 1, fuel: 0,   spread: 0, tool: true, desc: 'Obstacle indestructible, bloque les tirs tendus.' },
-  { k: 'WALL',     name: 'Mur de pierre',  col: [128, 124, 116], spd: 0,    block: 1, fuel: 0,   spread: 0, hp: 700, tool: true, desc: 'Bloque tout. Les troupes le contournent… ou le démolissent. Les explosions le détruisent.' },
-  { k: 'PALI',     name: 'Palissade',      col: [120, 92, 58],   spd: 0,    block: 1, fuel: 12,  spread: 0.3, hp: 260, tool: true, desc: 'Mur en bois, moins solide et inflammable.' },
-  { k: 'SPIKES',   name: 'Pieux / pièges', col: [110, 150, 72],  spd: 0.6,  block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Blessent toute unité qui les traverse.' },
-  { k: 'BURNT',    name: 'Cendres',        col: [72, 66, 58],    spd: 1.0,  block: 0, fuel: 0,   spread: 0 },
-  { k: 'RUBBLE',   name: 'Gravats',        col: [132, 120, 104], spd: 0.7,  block: 0, fuel: 0,   spread: 0 },
+  { k: 'GRASS',    name: 'Prairie',        col: [246, 246, 240],  spd: 1.0,  block: 0, fuel: 0,   spread: 0 },
+  { k: 'TALL',     name: 'Herbes hautes',  col: [214, 228, 150],  spd: 0.85, block: 0, fuel: 2.2, spread: 1.6, tool: true, desc: 'Très inflammable : le feu s\'y propage à toute vitesse.' },
+  { k: 'FOREST',   name: 'Forêt',          col: [176, 214, 140],   spd: 0.55, block: 0, fuel: 9,   spread: 0.45, tool: true, desc: 'Ralentit les troupes, arrête 35 % des tirs tendus. Brûle longtemps.' },
+  { k: 'WATER',    name: 'Eau peu profonde', col: [140, 206, 240], spd: 0.45, block: 0, fuel: 0,  spread: 0, water: 1, tool: true, desc: 'Ralentit fortement et éteint les unités en feu.' },
+  { k: 'DEEP',     name: 'Eau profonde',   col: [80, 160, 222],   spd: 0.3,  block: 2, fuel: 0,   spread: 0, water: 1, tool: true, desc: 'Infranchissable à pied. Les projectiles passent au-dessus.' },
+  { k: 'MUD',      name: 'Boue',           col: [200, 166, 122],   spd: 0.45, block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Englue les troupes, surtout la cavalerie.' },
+  { k: 'SAND',     name: 'Sable',          col: [245, 226, 166], spd: 0.8,  block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Léger ralentissement.' },
+  { k: 'ROAD',     name: 'Route',          col: [228, 216, 190], spd: 1.4,  block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Les troupes y marchent 40 % plus vite.' },
+  { k: 'ROCK',     name: 'Rochers',        col: [214, 210, 202], spd: 0,    block: 1, fuel: 0,   spread: 0, tool: true, desc: 'Obstacle indestructible, bloque les tirs tendus.' },
+  { k: 'WALL',     name: 'Mur de pierre',  col: [206, 200, 190], spd: 0,    block: 1, fuel: 0,   spread: 0, hp: 700, tool: true, desc: 'Bloque tout. Les troupes le contournent… ou le démolissent. Les explosions le détruisent.' },
+  { k: 'PALI',     name: 'Palissade',      col: [224, 204, 170],   spd: 0,    block: 1, fuel: 12,  spread: 0.3, hp: 260, tool: true, desc: 'Mur en bois, moins solide et inflammable.' },
+  { k: 'SPIKES',   name: 'Pieux / pièges', col: [236, 230, 208],  spd: 0.6,  block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Blessent toute unité qui les traverse.' },
+  { k: 'BURNT',    name: 'Cendres',        col: [170, 160, 148],    spd: 1.0,  block: 0, fuel: 0,   spread: 0 },
+  { k: 'RUBBLE',   name: 'Gravats',        col: [214, 206, 192], spd: 0.7,  block: 0, fuel: 0,   spread: 0 },
 ];
 G.TERRAIN.forEach((t, i) => (T[t.k] = i));
 

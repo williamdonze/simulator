@@ -4,25 +4,20 @@ Peins des armées, des châteaux, des forêts et des rivières, puis regarde des
 
 Ouvre simplement `index.html` dans un navigateur récent (WebGL2 requis). Aucune dépendance, aucun build.
 
-## Commandes
+## Comment jouer
 
-| Action | Contrôle |
-| --- | --- |
-| Peindre l'outil sélectionné | clic gauche / glisser |
-| Déplacer la caméra | clic droit, clic molette, ou `Espace` + glisser |
-| Zoom | molette (pincer sur mobile) |
-| Lancer / pause | bouton **Lancer**, `Entrée` ou `Espace` |
-| Rejouer depuis le déploiement | `R` |
-| Tout effacer | `C` |
-| Taille du pinceau | `[` et `]` |
-| Équipe (auto, rouge, bleu, vert, jaune) | `0` à `4` |
-| Recadrer / masquer l'interface | `F` / `H` |
+1. Choisis une unité dans la barre du bas.
+2. Glisse sur le terrain : à gauche de la ligne pointillée tes troupes sont rouges, à droite bleues.
+3. Clique sur **Lancer**.
+4. À la fin, clique sur **Voir les stats** si tu veux le détail (pertes, éliminations, meilleure unité).
 
-En mode **Auto**, tout ce qui est peint à gauche de la ligne pointillée est rouge, à droite bleu. Jusqu'à 4 équipes peuvent s'affronter. Clique sur **⚔ Attaque / 🛡 Défense** dans le panneau des équipes pour changer la posture d'une armée : en défense, elle tient sa position et n'engage que ce qui s'approche.
+- La molette (ou le pincement sur mobile) change la taille du pinceau. Le terrain tient toujours dans l'écran : pas de zoom.
+- **Rejouer** relance la même bataille ; la poubelle efface tout.
+- Raccourcis clavier : `Entrée` lance ou rejoue, `Espace` met en pause, `C` efface tout, `[` `]` changent la taille du pinceau.
 
 ## Contenu
 
-**26 unités** — paysan, fantassin, lancier, bouclier, chevalier, barbare, berserker, roi, archer, arbalétrier, javelinier, mousquetaire, tireur d'élite, grenadier, lance-flammes, mage, moine soigneur, tambour, ninja, sapeur, cavalier, archer monté, catapulte, baliste, canon, bélier.
+**26 unités** (style cartoon dessiné par code) — paysan, fantassin, lancier, bouclier, chevalier, barbare, berserker, roi, archer, arbalétrier, javelinier, mousquetaire, tireur d'élite, grenadier, lance-flammes, mage, moine soigneur, tambour, ninja, sapeur, cavalier, archer monté, catapulte, baliste, canon, bélier.
 
 **12 bâtiments** — hutte, caserne, camp d'archers, écurie, atelier de siège, tente de commandement, temple, tour d'archers, tour de mage, bastion à canon, château, baril de poudre.
 
@@ -54,4 +49,4 @@ Chaque élément a son propre comportement (survole un outil pour le lire) :
 - `js/render.js` : WebGL2, **un seul draw call instancié par couche**, tri en profondeur par counting sort, sol procédural en shader, couche persistante de décalques (cadavres, cratères, flèches plantées) dans un framebuffer.
 - `js/sprites.js` : tous les sprites sont dessinés procéduralement au démarrage dans un atlas, avec un masque pour la couleur d'équipe.
 
-Ordre de grandeur sur une machine de bureau : environ 9 à 16 ms par tick de simulation pour 50 000 unités en plein combat (scénario « Test de charge »), et moins de 3 ms pour 5 000 à 10 000 unités.
+Ordre de grandeur de la simulation (mesuré dans Node, sans rendu) : environ 9 à 16 ms par tick de simulation pour 50 000 unités en plein combat (scénario « Test de charge »), et moins de 3 ms pour 5 000 à 10 000 unités.

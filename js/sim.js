@@ -32,8 +32,10 @@
   const type = new Uint8Array(MAXU), team = new Uint8Array(MAXU), alive = new Uint8Array(MAXU), state = new Uint8Array(MAXU);
   const buffed = new Uint8Array(MAXU), dying = new Uint8Array(MAXU);
   const deadQ = [];
+  let curAtk = -1; // type of the unit currently dealing damage (stats)
+  const qsrc = new Int16Array(MAXP);
   function flushDeaths() {
-    for (let k = 0; k < deadQ.length; k += 2) { const j = deadQ[k]; dying[j] = 0; if (alive[j] && hp[j] <= 0) kill(j, deadQ[k + 1]); }
+    for (let k = 0; k < deadQ.length; k += 3) { const j = deadQ[k]; dying[j] = 0; if (alive[j] && hp[j] <= 0) kill(j, deadQ[k + 1], deadQ[k + 2]); }
     deadQ.length = 0;
   }
   const face = new Int8Array(MAXU);
@@ -151,14 +153,20 @@
     }
     S.count++;
     S.hw = hw;
+    if (S.phase === 'battle' && tm < 4) S.stat.deployed[t * 4 + tm]++;
     return i;
   };
 
   function freeSlot(i) { pendingFree.push(i); }
 
-  function kill(j, srcTeam) {
+  function kill(j, srcTeam, atkT) {
     if (!alive[j]) return;
     alive[j] = 0; S.count--; dying[j] = 0;
+    if (S.phase === 'battle' && team[j] < 4) {
+      const st = S.stat;
+      st.lost[type[j] * 4 + team[j]]++;
+      if (atkT >= 0 && srcTeam >= 0 && srcTeam < 4 && srcTeam !== team[j]) st.kills[atkT * 4 + srcTeam]++;
+    }
     freeSlot(j);
     const t = type[j], fl = UFL[t];
     if (srcTeam >= 0 && srcTeam < 4 && srcTeam !== team[j]) S.kills[srcTeam]++;
@@ -179,7 +187,7 @@
       if (G.UNITS[t].k === 'flamer') { R = 30; D = 45; fire = 1; }
       if (fl & F.NEUTRAL) { fire = 1; et = 255; }
       if (G.UNITS[t].k === 'sapper') { et = team[j]; fire = 4; }
-      S.explQ.push(x[j], y[j], R, D, et, fire | 2);
+      S.explQ.push(x[j], y[j], R, D, et, fire | 2, t);
     }
     if (fl & F.KING) {
       const tm = team[j];
@@ -201,7 +209,7 @@
     if (!ap) { const a = UARM[t]; amt = amt - a > amt * 0.2 ? amt - a : amt * 0.2; }
     hp[j] -= amt;
     flash[j] = 0.12;
-    if (hp[j] <= 0 && !dying[j]) { dying[j] = 1; deadQ.push(j, srcTeam); }
+    if (hp[j] <= 0 && !dying[j]) { dying[j] = 1; deadQ.push(j, srcTeam, curAtk); }
     return amt;
   }
   S.damage = damage;
@@ -639,7 +647,7 @@
   function fireArc(kind, sx, sy, tx, ty, tm, dmg, aoe, ap) {
     const p = newProj(); if (p < 0) return;
     const d = Math.hypot(tx - sx, ty - sy);
-    qkind[p] = kind; qteam[p] = tm; qalive[p] = 1; qdmg[p] = dmg; qaoe[p] = aoe; qap[p] = ap;
+    qkind[p] = kind; qteam[p] = tm; qalive[p] = 1; qdmg[p] = dmg; qaoe[p] = aoe; qap[p] = ap; qsrc[p] = curAtk;
     qsx[p] = sx; qsy[p] = sy; qtx[p] = tx; qty[p] = ty;
     qT[p] = d / ARC_SPD[kind] + 0.12; qt[p] = 0; qh[p] = Math.min(140, d * ARC_H[kind] + 4);
     qx[p] = qpx[p] = sx; qy[p] = qpy[p] = sy; qz[p] = qpz[p] = 8;
@@ -649,7 +657,7 @@
   function fireLin(kind, sx, sy, dirx, diry, tm, dmg, aoe, ap, range, pierce) {
     const p = newProj(); if (p < 0) return;
     const sp = LIN_SPD[kind];
-    qkind[p] = kind; qteam[p] = tm; qalive[p] = 1; qdmg[p] = dmg; qaoe[p] = aoe; qap[p] = ap;
+    qkind[p] = kind; qteam[p] = tm; qalive[p] = 1; qdmg[p] = dmg; qaoe[p] = aoe; qap[p] = ap; qsrc[p] = curAtk;
     qx[p] = qpx[p] = sx; qy[p] = qpy[p] = sy; qz[p] = qpz[p] = kind === P.CANNON ? 4 : 6;
     qvx[p] = dirx * sp; qvy[p] = diry * sp;
     qT[p] = range / sp; qt[p] = 0; qh[p] = 0;
@@ -660,6 +668,7 @@
   S.fireArc = fireArc; S.fireLin = fireLin;
 
   function hitscan(i, j, dmg, spread, ap) {
+    curAtk = type[i];
     const sx = x[i] + face[i] * 4, sy = y[i] - 6;
     let ang = Math.atan2(y[j] - y[i], x[j] - x[i]) + (rnd() - 0.5) * 2 * spread;
     const dx = Math.cos(ang), dy = Math.sin(ang);
@@ -703,6 +712,7 @@
         continue;
       }
       // straight
+      curAtk = qsrc[p];
       const sp = Math.hypot(qvx[p], qvy[p]);
       const steps = Math.max(1, Math.ceil((sp * dt) / 5));
       const sdt = dt / steps;
@@ -765,18 +775,19 @@
   function endLin(p, impact) {
     if (!qalive[p]) return;
     const kind = qkind[p];
-    if (kind === P.FIREBALL) { S.explQ.push(qx[p], qy[p], qaoe[p] || 28, qdmg[p], qteam[p], 1); }
-    else if (kind === P.CANNON) { S.explQ.push(qx[p], qy[p], 20, qdmg[p] * 0.5, qteam[p], 4); }
+    if (kind === P.FIREBALL) { S.explQ.push(qx[p], qy[p], qaoe[p] || 28, qdmg[p], qteam[p], 1, qsrc[p]); }
+    else if (kind === P.CANNON) { S.explQ.push(qx[p], qy[p], 20, qdmg[p] * 0.5, qteam[p], 4, qsrc[p]); }
     else if (kind === P.FLAME) { if (rnd() < 0.25) ignite(tcell(Math.max(0, Math.min(W - 1, qx[p])), Math.max(0, Math.min(H - 1, qy[p])))); }
     else if (impact) G.fx.spark(qx[p], qy[p], 2);
     freeProj(p);
   }
   function landArc(p) {
+    curAtk = qsrc[p];
     const kind = qkind[p], tm = qteam[p];
     const lx = qx[p], ly = qy[p];
-    if (kind === P.GRENADE) { S.explQ.push(lx, ly, qaoe[p], qdmg[p], tm, 0); freeProj(p); return; }
+    if (kind === P.GRENADE) { S.explQ.push(lx, ly, qaoe[p], qdmg[p], tm, 0, qsrc[p]); freeProj(p); return; }
     if (kind === P.STONE) {
-      S.explQ.push(lx, ly, qaoe[p], qdmg[p], tm, 4);
+      S.explQ.push(lx, ly, qaoe[p], qdmg[p], tm, 4, qsrc[p]);
       G.fx.decal(G.FR.crater, lx, ly, qaoe[p] * 0.9, qaoe[p] * 0.6, 0, 0xffffffff);
       freeProj(p); return;
     }
@@ -795,6 +806,7 @@
 
   // --------------------------------------------------------------- attacks
   function shoot(i, j) {
+    curAtk = type[i];
     const t = type[i], kind = UPROJ[t], tm = team[i];
     let dmg = UDMG[t] * (buffed[i] ? 1.3 : 1);
     const ap = UFL[t] & F.AP ? 1 : 0;
@@ -849,6 +861,7 @@
   }
 
   function melee(i, j, mult) {
+    curAtk = type[i];
     const t = type[i], fl = UFL[t], tj = type[j];
     let dmg = UDMG[t] * mult;
     if (buffed[i]) dmg *= 1.3;
@@ -917,6 +930,7 @@
   }
 
   function wallAttack(i) {
+    curAtk = type[i];
     const c = wallC[i];
     if (c < 0) return false;
     const tt = terr[c];
@@ -1208,6 +1222,7 @@
     const u = G.UNITS[t];
     // burning
     if (burn[i] > 0) {
+      curAtk = -1;
       burn[i] -= DT;
       damage(i, 14 * DT, -1, true);
       if (rnd() < 0.5) G.fx.buildingFire(x[i], y[i], UR[t]);
@@ -1263,7 +1278,7 @@
     // deferred explosions (chain reactions)
     if (S.explQ.length) {
       const q = S.explQ; S.explQ = [];
-      for (let k = 0; k < q.length && k < 6 * 400; k += 6) explode(q[k], q[k + 1], q[k + 2], q[k + 3], q[k + 4], q[k + 5]);
+      for (let k = 0; k < q.length && k < 7 * 400; k += 7) { curAtk = q[k + 6]; explode(q[k], q[k + 1], q[k + 2], q[k + 3], q[k + 4], q[k + 5]); }
       flushDeaths();
     }
     S.buildGrid();
@@ -1291,13 +1306,14 @@
       if (TWATER[tt]) burn[i] = 0;
       else if (fireT[tci] > 0 && !(fl & F.FIREPROOF)) burn[i] = Math.max(burn[i], 2.5);
       if (burn[i] > 0) {
+        curAtk = -1;
         burn[i] -= DT;
         damage(i, (fl & F.SIEGE ? 12 : 7) * DT, -1, true);
         if (TFUEL[tt] > 0 && rnd() < 0.04) ignite(tci);
         if (((tick + i) & 3) === 0) G.fx.unitFire(x[i], y[i]);
         if (!alive[i]) continue;
       }
-      if (tt === T.SPIKES) { damage(i, (fl & F.MOUNTED ? 30 : 16) * DT, -1, false); if (!alive[i]) continue; }
+      if (tt === T.SPIKES) { curAtk = -1; damage(i, (fl & F.MOUNTED ? 30 : 16) * DT, -1, false); if (!alive[i]) continue; }
       if (tm < 4 && healm[c * 4 + tm] && hp[i] < UHP[t]) { hp[i] = Math.min(UHP[t], hp[i] + 7 * DT); if (((tick + i) & 63) === 0) G.fx.heal(x[i], y[i] - 8); }
 
       if (stun[i] > 0) {
@@ -1457,6 +1473,9 @@
   // --------------------------------------------------------------- battle control
   S.startBattle = function () {
     S.phase = 'battle';
+    const NU = G.UNITS.length;
+    S.stat = { deployed: new Int32Array(NU * 4), lost: new Int32Array(NU * 4), kills: new Int32Array(NU * 4) };
+    for (let i = 0; i < hw; i++) if (alive[i] && team[i] < 4) S.stat.deployed[type[i] * 4 + team[i]]++;
     S.buildGrid();
     let n = 0;
     for (let k = 0; k < 4; k++) if (S.teamCount[k] > 0) n++;
