@@ -6,13 +6,13 @@
 //  (white = team coloured, black = keep base colour).
 // ============================================================================
 (function () {
-  const S = 4; // atlas pixels per world unit
-  const AW = 2048, AH = 2048;
+  const S = 10; // atlas pixels per world unit (high resolution: stays sharp when zooming in)
+  const AW = 4096, AH = 4096;
   const base = document.createElement('canvas');
   const mask = document.createElement('canvas');
-  base.width = mask.width = AW;
-  base.height = mask.height = AH;
-  const cb = base.getContext('2d');
+  base.width = AW; base.height = AH;
+  mask.width = mask.height = 4; // team mask unused in nature mode
+  const cb = base.getContext('2d', { willReadFrequently: true });
   const cm = mask.getContext('2d');
 
   const frames = []; // {name,x,y,w,h (px), ww, wh (world), px, py (pivot 0..1)}
@@ -79,28 +79,51 @@
   const tmpC = document.createElement('canvas');
   const tmpX = tmpC.getContext('2d');
   // cartoon contour: dilate the opaque silhouette behind the sprite
+  // cartoon contour: chamfer distance transform of the silhouette, O(n) per sprite,
+  // drawn behind the sprite with an anti-aliased edge
+  let distBuf = new Float32Array(0);
   function outlinePass(r, pw, ph, t) {
     pw = Math.ceil(pw); ph = Math.ceil(ph);
     const img = cb.getImageData(r.x, r.y, pw, ph);
-    const d = img.data;
-    tmpC.width = pw; tmpC.height = ph;
-    const sil = tmpX.createImageData(pw, ph), o = sil.data;
-    for (let k = 0; k < d.length; k += 4) if (d[k + 3] > 140) { o[k] = 43; o[k + 1] = 36; o[k + 2] = 51; o[k + 3] = 255; }
-    tmpX.putImageData(sil, 0, 0);
-    for (const c of [cb, cm]) {
-      c.save();
-      c.beginPath(); c.rect(r.x, r.y, pw, ph); c.clip();
-      c.globalCompositeOperation = 'destination-over';
-      if (c === cm) { tmpX.globalCompositeOperation = 'source-in'; tmpX.fillStyle = '#000'; tmpX.fillRect(0, 0, pw, ph); tmpX.globalCompositeOperation = 'source-over'; }
-      for (let a = 0; a < 12; a++) {
-        const an = (a / 12) * Math.PI * 2;
-        c.drawImage(tmpC, r.x + Math.cos(an) * t, r.y + Math.sin(an) * t);
-      }
-      c.restore();
+    const d = img.data, n = pw * ph;
+    if (distBuf.length < n) distBuf = new Float32Array(n);
+    const D = distBuf, INF = 1e9;
+    for (let k = 0; k < n; k++) D[k] = d[k * 4 + 3] > 140 ? 0 : INF;
+    const A = 1, B = 1.4142;
+    for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) {
+      const k = y * pw + x; let v = D[k]; if (v === 0) continue;
+      if (x > 0) v = Math.min(v, D[k - 1] + A);
+      if (y > 0) { v = Math.min(v, D[k - pw] + A); if (x > 0) v = Math.min(v, D[k - pw - 1] + B); if (x < pw - 1) v = Math.min(v, D[k - pw + 1] + B); }
+      D[k] = v;
     }
+    for (let y = ph - 1; y >= 0; y--) for (let x = pw - 1; x >= 0; x--) {
+      const k = y * pw + x; let v = D[k]; if (v === 0) continue;
+      if (x < pw - 1) v = Math.min(v, D[k + 1] + A);
+      if (y < ph - 1) { v = Math.min(v, D[k + pw] + A); if (x < pw - 1) v = Math.min(v, D[k + pw + 1] + B); if (x > 0) v = Math.min(v, D[k + pw - 1] + B); }
+      D[k] = v;
+    }
+    const OR = 43, OG = 36, OB = 51;
+    for (let k = 0; k < n; k++) {
+      const o = k * 4, sa = d[o + 3] / 255;
+      if (sa >= 1) continue;
+      const oa = Math.max(0, Math.min(1, t + 0.5 - D[k]));
+      if (oa <= 0) continue;
+      // sprite over outline (straight alpha)
+      const ra = sa + oa * (1 - sa);
+      d[o] = (d[o] * sa + OR * oa * (1 - sa)) / ra;
+      d[o + 1] = (d[o + 1] * sa + OG * oa * (1 - sa)) / ra;
+      d[o + 2] = (d[o + 2] * sa + OB * oa * (1 - sa)) / ra;
+      d[o + 3] = ra * 255;
+    }
+    cb.putImageData(img, r.x, r.y);
   }
-  function frame(name, ww, wh, pvx, pvy, draw, team = true, ol = team) {
-    const pw = ww * S, ph = wh * S;
+  let PAD = 0; // extra margin (world units) so nothing gets cropped
+  function frame(name, ww0, wh0, pvx0, pvy0, draw0, team = true, ol = team) {
+    const pad = PAD;
+    const ww = ww0 + pad * 2, wh = wh0 + pad * 2;
+    const pvx = (pvx0 * ww0 + pad) / ww, pvy = (pvy0 * wh0 + pad) / wh;
+    const draw = pad ? () => { cb.translate(pad, pad); cm.translate(pad, pad); draw0(); } : draw0;
+    const pw = Math.ceil(ww * S), ph = Math.ceil(wh * S);
     const r = alloc(pw, ph);
     cb.save(); cm.save();
     cb.translate(r.x, r.y); cm.translate(r.x, r.y);
@@ -113,7 +136,7 @@
     draw();
     pen.team = true;
     cb.restore(); cm.restore();
-    if (ol) outlinePass(r, pw, ph, ol === 'thin' ? 1.5 : 2.4);
+    if (ol) outlinePass(r, pw, ph, (ol === 'thin' ? 0.3 : 0.45) * S);
     FR[name] = frames.length;
     frames.push({ name, x: r.x, y: r.y, w: pw, h: ph, ww, wh, px: pvx, py: pvy });
     return frames.length - 1;
@@ -482,6 +505,7 @@
 
   // ==================================================================== build atlas
   G.buildAtlas = function () {
+    PAD = 3;
     const UN = G.UNITS;
     G.unitFrames = new Int32Array(UN.length * 4);
     G.unitFramesM = new Int32Array(UN.length * 4);
@@ -550,6 +574,7 @@
     }, false, true);
     frame('lily', 5, 3, 0.5, 0.5, () => { pen.begin().ell(2.5, 1.5, 2, 1).fill('#5aa04a'); circ(2.6, 1.2, 0.5, '#ffb0c8'); }, false, false);
 
+    PAD = 0;
     // ------------------------------------------------ fx
     frame('flame', 8, 8, 0.5, 0.5, () => { soft('rgba(255,240,170,1)', 'rgba(255,90,10,0)', 4, 4, 4); }, false);
     frame('smoke', 10, 10, 0.5, 0.5, () => { const g = cb.createRadialGradient(5, 5, 0, 5, 5, 4.8); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.7, 'rgba(255,255,255,0.95)'); g.addColorStop(1, 'rgba(255,255,255,0)'); cb.fillStyle = g; cb.beginPath(); cb.arc(5, 5, 4.8, 0, 7); cb.fill(); }, false);

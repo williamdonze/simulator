@@ -6,11 +6,17 @@ Ouvre `index.html` dans un navigateur récent (WebGL2). Aucune installation. Le 
 
 ## Comment jouer
 
-- Choisis une plante, un terrain ou un animal dans la barre du bas et peins sur la carte.
+- Choisis une plante, un terrain ou un animal dans la barre du bas et peins sur la carte (taille du pinceau : curseur, `[` `]` ou Maj + molette).
 - **▶ Lancer la vie**, puis accélère le temps (×4, ×16) pour voir les saisons et les générations passer.
-- La molette (ou le pincement) change la taille du pinceau. `Espace` met en pause.
-- **🔍 Loupe** (onglet Outils) : clique sur un animal pour voir son nom, son âge, sa faim, sa soif, ses petits, ses proies.
-- **📈** : courbes des populations (cycles proies / prédateurs).
+- **Zoom** : molette (vers le curseur), boutons + / − / ⤢, ou pincement sur mobile. **Se déplacer** : clic droit ou molette enfoncée, Espace + glisser, deux doigts.
+- **✋ Attraper / observer** (onglet Outils) : clique sur un animal pour ouvrir sa fiche, glisse-le pour le déplacer (double-clic : fiche depuis n'importe quel outil).
+- **Fiche d'un animal** :
+  - nom modifiable, sexe, génération, mère ;
+  - faim, soif, santé ;
+  - ce qu'il a mangé (plantes, viande, miel, eau), ses proies par espèce, ses petits, ses fuites, la distance parcourue ;
+  - son journal de vie, et un hommage à sa mort avec la cause ;
+  - **🎥 Suivre** : la caméra le suit comme dans un documentaire.
+- **📈** : courbes des populations. **📖 Carnet du naturaliste** : 26 phénomènes et secrets à découvrir, enregistrés dans le navigateur.
 
 ## Ce qui est simulé
 

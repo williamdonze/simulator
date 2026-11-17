@@ -31,6 +31,15 @@
   const tgt = new Int32Array(MAXU).fill(-1), home = new Int32Array(MAXU).fill(-1), nameI = new Int32Array(MAXU), kills = new Int32Array(MAXU), kids = new Int32Array(MAXU);
   const cellOf = new Int32Array(MAXU), cellItems = new Int32Array(MAXU), freeStack = new Int32Array(MAXU);
   const birthT = new Float32Array(MAXU);
+  // life statistics (shown in the animal sheet)
+  const ateP = new Float32Array(MAXU), ateM = new Float32Array(MAXU), ateH = new Float32Array(MAXU), drank = new Float32Array(MAXU), dist = new Float32Array(MAXU);
+  const gen = new Uint16Array(MAXU), mom = new Int32Array(MAXU).fill(-1), escapes = new Uint16Array(MAXU), momName = new Int32Array(MAXU).fill(-1);
+  const klog = new Map();        // index -> { species: count }
+  S.names = new Map();           // custom names given by the player
+  S.watch = -1; S.journal = []; S.obituary = null;
+  function log(i, msg) { if (i === S.watch) { S.journal.unshift({ d: S.time / DAY, msg }); if (S.journal.length > 30) S.journal.pop(); } }
+  S.log = log;
+  S.stats = { ateP, ateM, ateH, drank, dist, gen, mom, momName, escapes, klog };
   let hw = 0, freeTop = 0;
   const pendingFree = [];
   Object.assign(S, { x, y, px, py, z, hp, en, wat, age, type, alive, sex, state, face, atk, flash, anim, size, vari, team, tgt, home, kills, kids, nameI, burn, store, preg, birthT, maxAge });
@@ -143,6 +152,8 @@
     vari[i] = opts && opts.vari || 0;
     nameI[i] = (rnd() * 1e6) | 0;
     birthT[i] = S.time;
+    ateP[i] = ateM[i] = ateH[i] = drank[i] = dist[i] = 0; gen[i] = 1; mom[i] = -1; momName[i] = -1; escapes[i] = 0;
+    klog.delete(i); S.names.delete(i);
     size[i] = sizeOf(t, age[i]);
     if (UFL[t] & F.HIVE) store[i] = 8;
     S.count++;
@@ -152,9 +163,14 @@
   function free(i) { pendingFree.push(i); }
   S.remove = function (i) { if (!alive[i]) return; alive[i] = 0; S.count--; free(i); };
 
-  function die(i, cause) {
+  const CAUSE = { age: 'de vieillesse', hunger: 'de faim', thirst: 'de soif', fire: 'dans un incendie', wound: 'de ses blessures' };
+  function die(i, cause, killer) {
     if (!alive[i]) return;
     const t = type[i];
+    if (i === S.watch) {
+      const txt = killer != null && killer >= 0 ? `tué par un ${SP[type[killer]].name.toLowerCase()}` : CAUSE[cause] ? `mort ${CAUSE[cause]}` : cause === 'eaten' ? 'dévoré' : 'mort';
+      S.obituary = { name: S.nameOf(i), species: SP[t].name, cause: txt, age: age[i], kids: kids[i], kills: kills[i] };
+    }
     alive[i] = 0; S.count--; free(i);
     if (UFL[t] & (F.STATIC | F.MAGIC)) { if (UFL[t] & F.MAGIC) G.fx.sparkle(x[i], y[i] - 6, 10); return; }
     const meat = SP[t].meat * size[i];
@@ -165,6 +181,13 @@
     } else if (cause !== 'eaten') fertilize(x[i], y[i], 0.2);
   }
   S.die = die;
+  S.nameOf = function (i) {
+    if (S.names.has(i)) return S.names.get(i);
+    const k = SP[type[i]].k;
+    if (nameI[i] % 9 === 0 && G.SPECIAL_NAMES[k]) return G.SPECIAL_NAMES[k];
+    return G.NAMES[nameI[i] % G.NAMES.length];
+  };
+  S.nameFromSeed = (seed) => G.NAMES[seed % G.NAMES.length];
 
   function fertilize(wx, wy, amt) {
     const cx = (wx / TC) | 0, cy = (wy / TC) | 0;
@@ -505,6 +528,7 @@
           }
           // squirrels climb trees
           if (fl & F.ARBOREAL && terr[ci] === T.FOREST && !(UFL[type[p]] & F.AIR)) { state[i] = ST.SLEEP; hold[i] = 1; return; }
+          if (state[i] !== ST.FLEE) { escapes[i]++; log(i, `fuit un ${SP[type[p]].name.toLowerCase()} !`); }
           state[i] = ST.FLEE; tgt[i] = p;
           let ax = xi - x[p], ay = yi - y[p];
           if (fl & F.ARBOREAL && fdist[cellOf[i]] < 6) { ax += fdx[cellOf[i]] * pd; ay += fdy[cellOf[i]] * pd; }
@@ -659,6 +683,13 @@
     else state[i] = ST.WANDER;
   }
 
+  function recordKill(i, j) {
+    let m = klog.get(i);
+    if (!m) { m = {}; klog.set(i, m); }
+    const k = SP[type[j]].k;
+    m[k] = (m[k] || 0) + 1;
+    log(i, `a attrapé un ${SP[type[j]].name.toLowerCase()}`);
+  }
   // ---------------------------------------------------------------- per tick
   function bite(i, j) {
     const t = type[i];
@@ -667,9 +698,10 @@
     face[i] = x[j] > x[i] ? 1 : -1;
     if (hp[j] <= 0) {
       kills[i]++;
+      recordKill(i, j);
       const small = SP[type[j]].meat < 0.6 || (UFL[t] & F.AIR);
-      if (small) { en[i] = Math.min(1, en[i] + SP[type[j]].meat * 1.5 / Math.max(0.3, UR[t] * UR[t] / 20)); die(j, 'eaten'); state[i] = ST.WANDER; tgt[i] = -1; if (type[j] === U.dodo) toast('🦤 Et voilà… le dodo a encore disparu.', 'dodo'); }
-      else { die(j); state[i] = ST.WANDER; tgt[i] = -1; cd[i] = 0; }
+      if (small) { const g = SP[type[j]].meat * 1.5 / Math.max(0.3, UR[t] * UR[t] / 20); en[i] = Math.min(1, en[i] + g); ateM[i] += g; die(j, 'eaten', i); state[i] = ST.WANDER; tgt[i] = -1; if (type[j] === U.dodo) toast('🦤 Et voilà… le dodo a encore disparu.', 'dodo'); }
+      else { die(j, 'killed', i); state[i] = ST.WANDER; tgt[i] = -1; cd[i] = 0; }
       G.fx.poof(x[j], y[j] - 3);
     }
   }
@@ -720,7 +752,7 @@
       if (en[i] <= 0) { en[i] = 0; hp[i] -= UHP[t] * DT * 0.05; }
       if (wat[i] <= 0) { wat[i] = 0; hp[i] -= UHP[t] * DT * 0.06; }
       if (age[i] > maxAge[i] && !(fl & F.MAGIC && t !== U.bigfoot && t !== U.unicorn)) { die(i, 'age'); continue; }
-      if (hp[i] <= 0) { die(i); continue; }
+      if (hp[i] <= 0) { die(i, en[i] <= 0 ? 'hunger' : wat[i] <= 0 ? 'thirst' : 'wound'); continue; }
       if (hp[i] < UHP[t] && en[i] > 0.4) hp[i] = Math.min(UHP[t], hp[i] + UHP[t] * DT * 0.01);
       if (mateCd[i] > 0) mateCd[i] -= DT / DAY;
       if (cd[i] > 0) cd[i] -= DT;
@@ -728,7 +760,7 @@
       if (season === 3 && (t === U.butterfly || t === U.bee) && rnd() < DT * 0.05) { S.remove(i); continue; }
       // fire
       const ci = tc(x[i], y[i]);
-      if (fireT[ci] > 0 && !(fl & F.AIR)) { hp[i] -= UHP[t] * DT * 0.35; if (((tick + i) & 7) === 0) G.fx.unitFire(x[i], y[i]); if (hp[i] <= 0) { die(i); continue; } }
+      if (fireT[ci] > 0 && !(fl & F.AIR)) { hp[i] -= UHP[t] * DT * 0.35; if (((tick + i) & 7) === 0) G.fx.unitFire(x[i], y[i]); if (hp[i] <= 0) { die(i, 'fire'); continue; } }
       // gestation
       if (preg[i] > 0) {
         preg[i] -= DT / DAY;
@@ -762,8 +794,10 @@
       else if (rnd() < 1 / 300) v = 2;
       else if (t === U.crow && rnd() < 0.12) v = 4;
       const b = S.spawn(t, bx, by, { baby: true, home: i, ord: k, vari: v });
+      if (b >= 0) { gen[b] = gen[i] + 1; mom[b] = i; momName[b] = nameI[i]; if (S.names.has(i)) S.names.set(b, S.names.get(i) + ' junior'); }
       if (b >= 0) { kids[i]++; if (v === 2) toast(`🤍 Un ${u.name.toLowerCase()} albinos est né !`, 'albino' + t); }
     }
+    log(i, `a donné naissance à ${n} petit${n > 1 ? 's' : ''}`);
     if (golden) toast('✨ Un lapin doré est né ! Ouvre l\'œil (et la loupe).', 'golden' + Math.floor(S.time / DAY));
     en[i] -= 0.15;
   }
@@ -798,7 +832,7 @@
         if (fv <= 0 || veg[ci] < 0.04) { state[i] = ST.WANDER; break; }
         const cons = UR[t] * UR[t] / 40;
         const gain = Math.min(veg[ci] / cons, DT / (DAY * 0.05)) * fv;
-        en[i] = Math.min(1, en[i] + gain);
+        en[i] = Math.min(1, en[i] + gain); ateP[i] += gain;
         veg[ci] = Math.max(0, veg[ci] - gain * cons * (t === U.boar ? 1.6 : 1));
         if (t === U.boar && veg[ci] < 0.05 && rnd() < 0.002) S.setTerrain(ci, T.DIRT);
         if (t === U.squirrel && terr[ci] === T.FOREST && rnd() < 0.0015) plantNut(i);
@@ -841,7 +875,7 @@
       }
       case ST.DRINK: {
         if (TWATER[terr[ci]] || nearWater(x[i], y[i])) {
-          mvs = 0; wat[i] = Math.min(1, wat[i] + DT / (DAY * 0.04)); atk[i] = 0.1;
+          mvs = 0; wat[i] = Math.min(1, wat[i] + DT / (DAY * 0.04)); atk[i] = 0.1; drank[i] += DT / (DAY * 0.04);
           if (wat[i] > 0.97) state[i] = ST.WANDER;
           // bears fish while standing in the river
           break;
@@ -893,7 +927,7 @@
           if (UHAB[type[j]] === HB.WATER && l < 8) z[i] = 0;
         }
         if (t === U.bear && UHAB[type[j]] === HB.WATER && !TWATER[terr[ci]]) { mvs = 0.6; }
-        if (t === U.frog) { mvs = 0.3; if (l < 14) { G.fx.tongue(x[i], y[i] - 2, x[j], y[j] - z[j]); en[i] = Math.min(1, en[i] + 0.25); die(j, 'eaten'); state[i] = ST.WANDER; break; } }
+        if (t === U.frog) { mvs = 0.3; if (l < 14) { G.fx.tongue(x[i], y[i] - 2, x[j], y[j] - z[j]); en[i] = Math.min(1, en[i] + 0.25); ateM[i] += 0.25; kills[i]++; recordKill(i, j); die(j, 'eaten', i); state[i] = ST.WANDER; break; } }
         const reach = UR[t] + UR[type[j]] + 1.5;
         if (l < reach && cd[i] <= 0) bite(i, j);
         if (chaseT[i] > (u.chase || 3)) { state[i] = ST.WANDER; cd[i] = 4 + rnd() * 4; tgt[i] = -1; }
@@ -908,10 +942,10 @@
           mvs = 0; atk[i] = 0.15;
           const g = DT / (DAY * 0.06);
           if (UFL[type[j]] & F.HIVE) {
-            if (store[j] > 0) { store[j] -= g * 10; en[i] = Math.min(1, en[i] + g); if (rnd() < 0.05) { hp[i] -= 2; flash[i] = 0.1; } toast('🐻🍯 Un ours pille une ruche… et se fait piquer !', 'honey'); }
+            if (store[j] > 0) { store[j] -= g * 10; en[i] = Math.min(1, en[i] + g); ateH[i] += g; if (rnd() < 0.05) { hp[i] -= 2; flash[i] = 0.1; } toast('🐻🍯 Un ours pille une ruche… et se fait piquer !', 'honey'); }
             if (store[j] <= 0 || en[i] > 0.97) { state[i] = ST.WANDER; tgt[i] = -1; }
           } else {
-            store[j] -= g * UR[t] * UR[t] / 25; en[i] = Math.min(1, en[i] + g);
+            store[j] -= g * UR[t] * UR[t] / 25; en[i] = Math.min(1, en[i] + g); ateM[i] += g;
             if (en[i] > 0.98) { state[i] = ST.WANDER; tgt[i] = -1; }
           }
         }
@@ -924,6 +958,7 @@
         if (l < UR[t] * 2 + 3) {
           const f = sex[i] === 0 ? i : j;
           preg[f] = SP[t].gest; mateCd[i] = mateCd[j] = SP[t].gest * 1.2 + 0.3;
+          log(i, `a trouvé l'âme sœur : ${S.nameOf(j)}`); log(j, `a trouvé l'âme sœur : ${S.nameOf(i)}`);
           G.fx.heart(x[i], y[i] - UR[t] * 2 - z[i]);
           state[i] = state[j] = ST.WANDER; tgt[i] = tgt[j] = -1;
         }
@@ -951,8 +986,11 @@
           } else {
             const dmg = UR[t] * UR[t] * 0.3 * size[i];
             hp[j] -= dmg; flash[j] = 0.12; atk[i] = 0.3; cd[i] = 0.9;
-            if (hp[j] <= 0) { die(j); kills[i]++; state[i] = ST.WANDER; }
-            else if ((state[j] === ST.HUNT || state[j] === ST.STALK) && rnd() < 0.5) { state[j] = ST.FLEE; tgt[j] = i; cd[j] = 8; stam[j] = Math.max(stam[j], 2); }
+            if (hp[j] <= 0) { kills[i]++; recordKill(i, j); die(j, 'killed', i); state[i] = ST.WANDER; }
+            else {
+              log(j, `a été blessé par un ${SP[t].name.toLowerCase()} qui se défendait`);
+              if ((state[j] === ST.HUNT || state[j] === ST.STALK) && rnd() < 0.5) { state[j] = ST.FLEE; tgt[j] = i; cd[j] = 8; stam[j] = Math.max(stam[j], 2); }
+            }
           }
         }
         if (((S.tick + i) % 90) === 0) state[i] = ST.WANDER;
@@ -1022,6 +1060,7 @@
     else { const a = Math.atan2(dY[i], dX[i]) + Math.PI * (0.6 + rnd() * 0.8); dX[i] = Math.cos(a); dY[i] = Math.sin(a); if (state[i] === ST.SEEK) state[i] = ST.WANDER; }
     if (dX[i] > 0.15) face[i] = 1; else if (dX[i] < -0.15) face[i] = -1;
     anim[i] += sp * DT * 0.22;
+    dist[i] += sp * DT;
   }
 
   // -------------------------------------------- separation (Jacobi, ground and air layers)
@@ -1097,8 +1136,8 @@
   S.eraseAt = function (wx, wy, rad) {
     for (let i = 0; i < hw; i++) if (alive[i] && Math.hypot(x[i] - wx, y[i] - wy) < rad + UR[type[i]]) S.remove(i);
   };
-  S.pick = function (wx, wy) {
-    let best = -1, bd = 14 * 14;
+  S.pick = function (wx, wy, rad = 14) {
+    let best = -1, bd = rad * rad;
     for (let i = 0; i < hw; i++) {
       if (!alive[i]) continue;
       const dx = x[i] - wx, dy = y[i] - z[i] - UR[type[i]] - wy, d = dx * dx + dy * dy;

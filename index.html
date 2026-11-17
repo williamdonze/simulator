@@ -94,6 +94,37 @@
     .tool { width: 46px; height: 46px; } .tool img { width: 40px; height: 40px; }
     #card { top: auto; bottom: 200px; left: 8px; }
   }
+
+  #zoomrow { display: flex; gap: 4px; align-items: center; }
+  #zoomrow button { width: 26px; height: 24px; border-radius: 7px; background: var(--line); font-size: 15px; line-height: 1; }
+  #zoomLvl { font-size: 12px; color: var(--muted); min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
+  #bookBtn { padding: 3px 8px; border-radius: 8px; background: var(--line); font-size: 12px; }
+  #brushRow { display: flex; align-items: center; gap: 8px; margin-top: 6px; padding: 4px 10px; font-size: 12px; color: var(--muted); background: var(--panel); border-radius: 10px; width: max-content; box-shadow: var(--shadow); }
+  #brushRow input { width: 120px; accent-color: #3aa655; }
+  #card { width: 270px; max-height: calc(100vh - 230px); overflow: auto; }
+  #cname { font: inherit; font-weight: 800; font-size: 15px; border: 0; background: transparent; padding: 1px 3px; margin-left: -3px; border-radius: 6px; width: 100%; color: var(--ink); }
+  #cname:hover:not(:disabled), #cname:focus { background: var(--line); outline: none; }
+  .sect { margin-top: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .preys { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+  .preys span { display: flex; align-items: center; gap: 2px; background: var(--line); border-radius: 8px; padding: 1px 6px 1px 2px; font-size: 12px; }
+  .preys img { width: 22px; height: 22px; }
+  .jr { font-size: 12px; font-weight: 500; margin-top: 3px; display: grid; gap: 2px; }
+  .jr i { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 4px; }
+  .cbtns { display: flex; gap: 6px; margin-top: 8px; }
+  .cbtns button { flex: 1; padding: 7px 8px; border-radius: 10px; background: var(--line); font-size: 12px; }
+  .cbtns button.on { background: #2b2433; color: #fff; }
+  .tomb { font-size: 30px; }
+  #book { position: fixed; inset: 0; background: rgba(43,36,51,.35); display: none; place-items: center; z-index: 20; padding: 16px; }
+  #book.show { display: grid; }
+  #bcard { width: min(640px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 16px; }
+  #bcard h2 { margin: 0; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
+  #bcard p { color: var(--muted); font-size: 12px; font-weight: 500; margin: 4px 0 10px; }
+  #bookX { width: 30px; height: 30px; border-radius: 50%; background: var(--line); }
+  #bookGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+  .disc { border-radius: 12px; background: var(--line); padding: 8px; display: grid; gap: 2px; justify-items: center; text-align: center; opacity: .75; }
+  .disc span { font-size: 24px; } .disc b { font-size: 13px; } .disc small { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .disc.ok { background: #e6f4dd; opacity: 1; }
+  @media (max-width: 680px) { #brushRow { display: none; } #zoomrow button { width: 30px; height: 28px; } }
 </style>
 </head>
 <body>
@@ -104,10 +135,12 @@
   <div id="clock"></div>
   <div id="hudrow"><span id="pop"></span>
     <div id="speed"><button data-s="1">×1</button><button data-s="4">×4</button><button data-s="16">×16</button></div>
-    <button id="graphBtn" title="Évolution des populations">📈</button></div>
+    <button id="graphBtn" title="Évolution des populations">📈</button>
+    <button id="bookBtn" title="Carnet du naturaliste">📖 <span id="bookN"></span></button></div>
+  <div id="zoomrow"><button id="zout" aria-label="Dézoomer">−</button><span id="zoomLvl">×1</span><button id="zin" aria-label="Zoomer">+</button><button id="zfit" title="Vue d'ensemble">⤢</button></div>
 </div>
 
-<div id="bar"><div id="tabs"></div><div id="tools"></div></div>
+<div id="bar"><div id="tabs"></div><div id="tools"></div><label id="brushRow">Pinceau <input type="range" id="brush" min="4" max="120" value="28"></label></div>
 <div id="name"></div>
 <div id="card" class="panel"></div>
 
@@ -120,6 +153,7 @@
 <div id="toast" class="panel"></div>
 <div id="graph"><div id="gcard" class="panel"><h2>Populations <button id="graphX" aria-label="Fermer">✕</button></h2><canvas id="graphCv"></canvas><div id="legend"></div>
   <p>Clique sur une espèce pour l'afficher ou la masquer. Les cycles proies / prédateurs apparaissent au bout de quelques jours (vitesse ×16 conseillée).</p></div></div>
+<div id="book"><div id="bcard" class="panel"><h2>📖 Carnet du naturaliste <button id="bookX" aria-label="Fermer">✕</button></h2><p>Tout ce que tu as observé dans tes mondes. Tes découvertes restent enregistrées dans ce navigateur.</p><div id="bookGrid"></div></div></div>
 <div id="err" style="display:none;position:fixed;inset:30% 20px auto;padding:16px;background:#fff;color:#b00;border-radius:12px;text-align:center"></div>
 
 <script src="js/defs.js"></script>
