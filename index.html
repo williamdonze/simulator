@@ -110,13 +110,21 @@
     #bar { left: 12px; transform: none; width: calc(100vw - 186px); }
   }
   @media (max-width: 720px) {
-    #hud { width: 180px; padding: 8px; }
-    #opts, #perf { display: none; }
+    #title { top: 8px; left: 8px; padding: 6px 10px; }
+    #title h1 { font-size: 16px; }
     #title small { display: none; }
+    #hud { top: 8px; right: 8px; width: 150px; padding: 7px 9px; }
+    #hud #clock { font-size: 13px; margin-bottom: 2px; }
+    #opts, #perf { display: none; }
+    #actions { bottom: auto; top: 50px; left: 8px; width: calc(100vw - 174px); padding: 6px; gap: 5px; flex-direction: row; flex-wrap: wrap; }
+    #actions .big { flex: 1 1 100%; padding: 7px; font-size: 15px; }
+    #actions .row { flex: 1 1 100%; }
+    #rowfit { display: none !important; }
+    #actions .small { padding: 5px 2px; font-size: 12px; }
     #bar { left: 8px; right: 8px; width: auto; bottom: 8px; padding: 6px 8px 8px; }
-    #actions { bottom: auto; top: 64px; right: auto; left: 8px; width: 132px; padding: 8px; }
-    #actions .big { padding: 8px; font-size: 15px; }
+    #row2 { gap: 8px 12px; }
     .tool { width: 58px; } .tool img { width: 38px; height: 38px; }
+    input[type=range] { width: 90px; }
     #labels { display: none !important; }
   }
 </style>
@@ -135,7 +143,7 @@
     <label>Taille de la carte <select id="mapSize"><option value="S">Petite</option><option value="M" selected>Moyenne</option><option value="L">Grande</option><option value="XL">Immense</option></select></label>
     <label>Barres de vie des unités <input type="checkbox" id="optBars"></label>
     <label>Tir ami (explosions) <input type="checkbox" id="optFF"></label>
-    <label>Vent (propagation du feu) <input type="range" id="optWind" min="0" max="200" value="0"></label>
+    <label>Vent (feu) <input type="range" id="optWind" min="0" max="200" value="0"></label>
   </div>
 </div>
 
@@ -154,7 +162,7 @@
 <div id="actions" class="panel">
   <button id="start" class="big go">▶ Lancer</button>
   <div class="row"><button id="replay" class="small" title="Rejouer depuis le déploiement (R)">↺ Rejouer</button><button id="clear" class="small danger" title="Tout effacer (C)">Effacer</button></div>
-  <div class="row"><button id="fit" class="small" title="Recadrer (F)">⤢ Recadrer</button></div>
+  <div class="row" id="rowfit"><button id="fit" class="small" title="Recadrer (F)">⤢ Recadrer</button></div>
   <select id="scen"><option value="">Scénarios…</option></select>
 </div>
 

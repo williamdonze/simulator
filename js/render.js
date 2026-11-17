@@ -97,7 +97,13 @@
       o = vec4(mix(vec3(0.19,0.24,0.16), vec3(0.11,0.13,0.10), clamp(e/60.0,0.0,1.0)), 1.0); return;
     }
     vec2 uv = w / uWorld;
-    vec4 t = texture(uTerr, uv);
+    // organic, crisp terrain borders: warp the lookup with noise, then sharpen the bilinear blend
+    vec2 ts = vec2(textureSize(uTerr, 0));
+    vec2 warp = vec2(vn(w * 0.11), vn(w * 0.11 + 17.3)) - 0.5;
+    vec2 p = w / uWorld * ts - 0.5 + warp * 1.1;
+    vec2 fp = fract(p);
+    fp = smoothstep(0.32, 0.68, fp);
+    vec4 t = texture(uTerr, (floor(p) + fp + 0.5) / ts);
     vec3 c = t.rgb;
     float n = vn(w * 0.035) * 0.55 + vn(w * 0.16) * 0.3 + h21(floor(w * 0.9)) * 0.15;
     c *= 0.88 + n * 0.24;
@@ -245,7 +251,7 @@
     for (let c = 0, n = terr.length; c < n; c++) {
       const tt = terr[c];
       const col = TER[tt].col;
-      const v = ((tvar[c] >> 2) - 32) / 32 * 0.06 + 1;
+      const v = ((tvar[c] >> 2) - 32) / 32 * (tt === T.GRASS ? 0.018 : 0.05) + 1;
       let r = col[0] * v, g = col[1] * v, b = col[2] * v;
       if (fire[c] > 0) { r = r * 0.4 + 200; g = g * 0.4 + 70; b = b * 0.3 + 10; }
       const o = c * 4;
