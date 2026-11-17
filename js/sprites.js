@@ -207,6 +207,35 @@
         break; // drawn on torso
       case 'bomb':
         break; // carried overhead
+      case 'ar':
+        if (atk) { line(hx - 3.2, hy + 0.5, hx + 5.4, hy - 0.2, '#2e2e35', 0.85); box(hx + 0.3, hy + 0.2, 0.8, 1.4, '#2e2e35'); }
+        else { line(hx - 2.2, hy + 2, hx + 3.6, hy - 3.2, '#2e2e35', 0.85); box(hx - 0.2, hy - 0.6, 0.8, 1.3, '#2e2e35'); }
+        break;
+      case 'mg':
+        if (atk) { line(hx - 3.6, hy + 0.5, hx + 6.6, hy - 0.2, '#2e2e35', 1.15); line(hx + 4.5, hy, hx + 5.4, hy + 2.2, '#555', 0.35); line(hx + 4.5, hy, hx + 3.6, hy + 2.2, '#555', 0.35); line(hx - 0.6, hy + 0.6, hx - 1.4, hy + 2.6, '#c9a43a', 0.5); }
+        else { line(hx - 3, hy + 1.4, hx + 5, hy - 2.4, '#2e2e35', 1.15); line(hx - 0.4, hy + 0.4, hx - 1.4, hy + 2.4, '#c9a43a', 0.5); }
+        break;
+      case 'rpg': {
+        const yy = atk ? hy - 0.6 : hy - 1;
+        line(hx - 5.4, yy + 0.4, hx + 3.2, yy - 0.3, '#56603f', 1.25);
+        poly([hx + 3, yy - 1.1, hx + 6, yy - 0.4, hx + 3, yy + 0.5], '#3c4030');
+        if (atk) circ(hx - 6.2, yy + 0.5, 0.9, '#ffb347');
+        break;
+      }
+      case 'pistol': line(hx, hy, hx + 2.2, hy - 0.4, '#2e2e35', 0.7); break;
+      case 'smg':
+        line(hx - 1.6, hy + 0.3, hx + 3.6, hy - 0.3, '#2e2e35', 0.85); box(hx + 0.2, hy + 0.2, 0.7, 1.2, '#2e2e35');
+        break;
+      case 'baton':
+        if (atk) line(hx, hy, hx + 4.2, hy - 2.4, '#222', 0.6); else line(hx, hy, hx + 0.8, hy - 4.2, '#222', 0.6);
+        break;
+      case 'medkit':
+        rbox(hx - 0.4, hy - 0.6, 2.8, 2.2, 0.4, '#f4f2ec'); box(hx + 0.75, hy - 0.35, 0.5, 1.7, '#d33'); box(hx + 0.15, hy + 0.25, 1.7, 0.5, '#d33');
+        if (atk) { circ(hx + 2.2, hy - 3.6, 1.4, 'rgba(140,255,150,0.65)'); }
+        break;
+      case 'c4':
+        rbox(hx - 1.2, hy - 0.8, 2.8, 1.8, 0.3, '#cdb873'); line(hx - 0.6, hy - 0.8, hx + 0.6, hy - 1.8, '#d33', 0.25); line(hx + 0.4, hy - 0.8, hx + 1.4, hy - 1.6, '#36f', 0.25);
+        break;
       case 'javelin':
         if (atk) { line(hx - 4, hy - 0.6, hx + 8, hy - 2, WOOD, 0.5); poly([hx + 8, hy - 2.6, hx + 9.8, hy - 2.2, hx + 8.1, hy - 1.5], '#dfe5ea'); }
         else { line(hx - 3, hy - 4, hx + 6, hy - 6.6, WOOD, 0.5); poly([hx + 6, hy - 7.2, hx + 7.8, hy - 7, hx + 6.2, hy - 6.1], '#dfe5ea'); }
@@ -303,6 +332,29 @@
         rbox(hx - 2.3, hy - 3.6, 4.6, 2.4, 1, '#7d5a3a');
         box(hx - 2.4, hy - 1.8, 4.8, 0.8, '#5d4128');
         break;
+      case 'combat':
+      case 'medic': {
+        const c = L.helmet === 'medic' ? '#f2f1ec' : '#5f6b45';
+        pen.begin().arc(hx, hy - 0.3, 2.35, Math.PI, 0).fill(c);
+        line(hx - 2.65, hy - 0.25, hx + 2.65, hy - 0.25, L.helmet === 'medic' ? '#c9c7c0' : '#4b5536', 0.55);
+        if (L.helmet === 'medic') { box(hx - 0.25, hy - 2.3, 0.5, 1.4, '#d33'); box(hx - 0.7, hy - 1.85, 1.4, 0.5, '#d33'); }
+        else line(hx - 2.05, hy - 1.05, hx + 2.05, hy - 1.05, 1.0, 0.4);
+        break;
+      }
+      case 'beret':
+        pen.begin().ell(hx - 0.4, hy - 1.7, 2.6, 1.05).fill(1.0);
+        circ(hx + 1.2, hy - 1.7, 0.4, '#f0cf4a');
+        break;
+      case 'balaclava':
+        pen.begin().arc(hx, hy, 2.2).fill('#26262c').stroke(OL, 0.2);
+        rbox(hx - 0.1, hy - 0.85, 2.3, 1.1, 0.4, SKIN);
+        circ(hx + 0.75, hy - 0.3, 0.26, '#111'); circ(hx + 1.6, hy - 0.3, 0.26, '#111');
+        line(hx - 2.1, hy + 0.9, hx + 2.1, hy + 0.9, 1.0, 0.35);
+        break;
+      case 'riot':
+        pen.begin().arc(hx, hy - 0.2, 2.45, Math.PI, 0).fill('#2b3440');
+        pen.begin().arc(hx + 0.3, hy + 0.1, 2.4, -1.2, 0.9).fill('rgba(170,210,240,0.55)');
+        break;
       case 'crown':
         poly([hx - 2.2, hy - 1.4, hx - 2.2, hy - 4, hx - 1.1, hy - 2.8, hx, hy - 4.4, hx + 1.1, hy - 2.8, hx + 2.2, hy - 4, hx + 2.2, hy - 1.4], '#f1c84a', '#a37a1a', 0.2);
         circ(hx, hy - 2.3, 0.4, '#d23');
@@ -344,6 +396,10 @@
     if (L.robe) pen.begin().moveTo(5.3, 8.3).lineTo(10.7, 8.3).lineTo(11.6, 14.3).quad(8, 15, 4.4, 14.3).close().fill(tunic === 1 ? 0.92 : tunic).stroke(OL, 0.35);
     else pen.begin().rrect(4.8, 8.1, 6.4, 5.9, 2.6).fill(bodyC).stroke(OL, 0.35);
     if (L.armor) { rbox(7.2, 8.5, 1.8, 5.1, 0.6, tunic); }
+    if (L.vest) {
+      line(5.6, 8.6, 9.6, 12.6, '#3f4630', 0.7);
+      rbox(6.6, 10.6, 1.3, 1.4, 0.3, '#3f4630'); rbox(8.3, 10.6, 1.3, 1.4, 0.3, '#3f4630');
+    }
     if (L.bare) { pen.begin().rrect(4.9, 11.3, 6.2, 2.5, 1).fill(tunic).stroke(OL, 0.25); }
     else if (!L.robe) line(5.1, 11.5, 10.9, 11.5, '#4a3428', 0.55);
     if (L.weapon === 'drum') {
@@ -359,6 +415,10 @@
       case 'spear': hx = atk ? 12 : 11.2; hy = 10.4; break;
       case 'grenade': hx = atk ? 9.4 : 11.4; hy = atk ? 3.4 : 11.2; break;
       case 'bomb': hx = 8.6; hy = atk ? 2.2 : 11; break;
+      case 'rpg': hx = 10.4; hy = 9; break;
+      case 'mg': hx = atk ? 11.6 : 11; hy = atk ? 10.4 : 11; break;
+      case 'c4': hx = atk ? 10.6 : 11.2; hy = atk ? 6 : 11; break;
+      case 'medkit': hx = 11.2; hy = 11; break;
       case 'javelin': hx = atk ? 12.4 : 9.6; hy = atk ? 8.2 : 4.6; break;
       case 'staff': hx = atk ? 12 : 11.4; hy = atk ? 9 : 10.6; break;
       case 'book': hx = 11.2; hy = 10.6; break;
@@ -367,6 +427,13 @@
       default: hx = atk ? 12.4 : 11.3; hy = atk ? 9.6 : 11;
     }
     if (L.weapon === 'bomb' && atk) { pen.begin().arc(8.6, 0.6, 2.3).fill('#2a2a2a').stroke(OL, 0.3); line(8.6, -1.6, 9.4, -2.6, '#e0a030', 0.4); }
+    if (L.shield === 'riot') {
+      xf(hx, hy, 1.2, hx, hy, () => drawWeapon(L, f, hx, hy));
+      pen.begin().rrect(9.6, 6.6, 3.4, 8.2, 0.8).fill('rgba(175,205,235,0.88)').stroke(OL, 0.4);
+      line(10.4, 9.6, 12.2, 9.6, 1.0, 0.8);
+      line(10.2, 7.6, 10.2, 13.6, 'rgba(255,255,255,0.7)', 0.3);
+      return;
+    }
     if (L.shield === 'tower') {
       xf(hx, hy, 1.2, hx, hy, () => drawWeapon(L, f, hx, hy));
       pen.begin().rrect(9.4, 6.8, 3.4, 8, 1).fill(1.0).stroke(OL, 0.4);
@@ -479,181 +546,222 @@
     for (let xx = x; xx < x + w - 0.5; xx += 2.2) box(xx, y - 1.4, 1.3, 1.5, c);
   }
 
+  // ==================================================================== modern vehicles
+  const OLIVE = '#56603f', OLIVE_D = '#3f4630', GLASS = '#a8ddf5', STEEL = '#2e2e35';
+  function tire(x, y, r, f) {
+    circ(x, y, r, '#2f2b33'); circ(x, y, r * 0.48, '#8d9299');
+    const a = f * 0.8;
+    line(x - Math.cos(a) * r * 0.42, y - Math.sin(a) * r * 0.42, x + Math.cos(a) * r * 0.42, y + Math.sin(a) * r * 0.42, '#5a5e64', 0.35);
+  }
+  function tracks(x, y, w, h, f) {
+    rbox(x, y, w, h, h / 2, '#3b3740');
+    const n = Math.round(w / 4.4);
+    for (let k = 0; k < n; k++) circ(x + h / 2 + k * ((w - h) / (n - 1)), y + h / 2, h * 0.28, '#77727c');
+    for (let xx = x + 1 + (f % 2) * 1.2; xx < x + w - 1; xx += 2.4) line(xx, y + 0.3, xx, y + 0.9, '#5d5864', 0.4);
+  }
+  const VEH = {
+    jeep: [24, 18, 15.5, (f) => {
+      tire(6, 13.4, 2.6, f); tire(18, 13.4, 2.6, f);
+      pen.begin().moveTo(2.5, 13).lineTo(2.5, 9).lineTo(12.5, 8.6).lineTo(14, 7.6).lineTo(21.5, 8).lineTo(22, 13).close().fill(0.95);
+      line(13.6, 7.8, 12.6, 4.8, GLASS, 0.9);
+      line(5, 9, 5, 5.6, '#555', 0.6); line(5, 5.6, 9.5, 5.6, '#555', 0.6);
+      circ(9.5, 4.6, 1.6, SKIN); pen.begin().arc(9.5, 4.3, 1.75, Math.PI, 0).fill('#5f6b45');
+      line(10.6, 7.6, 11.2, 4.4, '#444', 0.5);
+      line(10.4, 4.1, f === 2 ? 15.6 : 16.4, 3.6, STEEL, 0.85);
+      if (f === 2) circ(17, 3.5, 1.1, '#ffd25a');
+      circ(21.3, 9.6, 0.6, '#ffe9a0');
+    }],
+    apc: [28, 21, 18, (f) => {
+      for (const xx of [6, 11, 17, 22]) tire(xx, 16, 2.3, f);
+      pen.begin().moveTo(2, 15.6).lineTo(3, 9.4).lineTo(7, 7.4).lineTo(22, 7.4).lineTo(26.6, 10.4).lineTo(26, 15.6).close().fill(0.92);
+      line(3, 12, 26, 12, OLIVE_D, 0.4);
+      box(9.5, 9.2, 2, 1.4, GLASS); box(13.5, 9.2, 2, 1.4, GLASS);
+      rbox(11, 4.4, 7, 3.4, 1.2, 0.8);
+      line(17.4, 5.6, f === 2 ? 25 : 26.4, 5.2, STEEL, 0.95);
+      if (f === 2) circ(27, 5.2, 1.2, '#ffd25a');
+    }],
+    tank: [34, 24, 20.5, (f) => {
+      tracks(2.5, 14.2, 29, 6, f);
+      pen.begin().moveTo(3, 14.6).lineTo(5, 10.6).lineTo(29, 10.6).lineTo(32, 13).lineTo(31, 14.6).close().fill(0.9);
+      rbox(10, 5.6, 13, 5.6, 2.4, 1.0);
+      rbox(13, 4.4, 4.4, 1.6, 0.6, 0.78);
+      const rec = f === 2 ? 2 : 0;
+      line(22, 7.9, 33.4 - rec, 7.5, '#3b3a35', 1.4);
+      box(31.6 - rec, 6.7, 1.8, 1.6, '#3b3a35');
+      if (f === 2) circ(33.6, 7.4, 1.8, '#ffd25a');
+    }],
+    artillery: [34, 23, 20, (f) => {
+      line(3, 19, 14, 14, OLIVE_D, 1.2); line(5, 19.4, 14.5, 14.8, OLIVE, 1.0);
+      const rec = f === 2 ? 2 : 0;
+      line(14 - rec * 0.6, 11, 31 - rec, 3.2, '#4a4f3a', 1.6);
+      box(28.6 - rec, 2.6, 2.2, 1.6, '#3b3f2e');
+      pen.begin().moveTo(12, 14).lineTo(13, 8.4).lineTo(19, 8.4).lineTo(19.6, 14).close().fill(1.0);
+      tire(15.5, 16.6, 3.5, f);
+      if (f === 2) circ(32.4, 2.8, 1.8, '#ffd25a');
+    }],
+    mlrs: [31, 22, 19, (f) => {
+      for (const xx of [6, 12, 24]) tire(xx, 17, 2.3, f);
+      box(3, 13, 24, 2.6, OLIVE_D);
+      rbox(20.5, 7.8, 7.6, 6.2, 1.6, 0.95);
+      box(23.8, 8.8, 3.2, 2.3, GLASS);
+      pen.begin().moveTo(2.8, 12.6).lineTo(4, 6.4).lineTo(18.4, 3.6).lineTo(19.2, 10.2).close().fill(0.82);
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) circ(15.6 + r * 1.5 + c * 0.25, 4.9 + c * 1.35 + r * 0.2, 0.55, '#2b2b2b');
+      if (f === 2) for (let k = 0; k < 3; k++) circ(3 + k * 1.2, 8 + k * 1.3, 1.2, '#ffd25a');
+    }],
+    aa: [31, 26, 22.5, (f) => {
+      tracks(3, 16.4, 25, 6, f);
+      pen.begin().moveTo(3.4, 16.8).lineTo(5, 13).lineTo(26, 13).lineTo(28, 15.4).lineTo(27.4, 16.8).close().fill(0.9);
+      rbox(9, 8.6, 11, 5.4, 2, 1.0);
+      line(16, 9.6, 27, 2.6, STEEL, 0.8); line(17, 11, 28.4, 4, STEEL, 0.8);
+      line(10.4, 8.8, 9.6, 4.6, '#555', 0.5);
+      pen.begin().ell(9.2, 4, f === 1 ? 1.4 : 2.7, 1.1).fill('#c3c9d0');
+      if (f === 2) { circ(27.6, 2.2, 1.1, '#ffd25a'); circ(29, 3.6, 1.1, '#ffd25a'); }
+    }],
+  };
+  const AIRC = {
+    fpv: [14, 10, (f) => {
+      line(2.4, 4, 11.6, 4, '#3a3640', 0.7);
+      const w = f === 1 ? 2.8 : 2.2;
+      pen.begin().ell(2.4, 3.2, w, 0.55).fill('rgba(60,60,72,0.45)');
+      pen.begin().ell(11.6, 3.2, w, 0.55).fill('rgba(60,60,72,0.45)');
+      rbox(4.5, 3.5, 5, 3, 1.2, 1.0);
+      circ(9.6, 5, 0.75, '#222');
+      rbox(5.2, 6.4, 3.6, 1.7, 0.6, '#d4682a');
+    }],
+    bomber: [18, 14, (f) => {
+      line(2, 4.6, 16, 4.6, '#3a3640', 0.8);
+      const w = f === 1 ? 2.9 : 2.3;
+      for (const xx of [2.2, 9, 15.8]) pen.begin().ell(xx, 3.6, w, 0.6).fill('rgba(60,60,72,0.45)');
+      line(9, 4.6, 9, 3.6, '#3a3640', 0.6);
+      rbox(5.6, 4.2, 6.8, 3.6, 1.4, 1.0);
+      line(6.4, 7.8, 5.6, 9.4, '#3a3640', 0.4); line(11.6, 7.8, 12.4, 9.4, '#3a3640', 0.4);
+      pen.begin().ell(9, 10, 1.3, 2).fill('#3a3a3a');
+      line(9, 11.8, 9, 12.6, '#3a3a3a', 0.9);
+    }],
+    heli: [34, 19, (f) => {
+      pen.begin().ell(18, 2.4, f === 1 ? 15 : 13.5, 0.9).fill('rgba(50,50,62,0.42)');
+      line(18, 2.8, 18, 5.6, '#3a3640', 0.6);
+      pen.begin().moveTo(3, 7.4).lineTo(17, 7).lineTo(17, 10.6).lineTo(3, 8.8).close().fill(0.8);
+      poly([2, 8.4, 3, 4.6, 5.2, 8.2], 0.75);
+      pen.begin().arc(3, 6.2, f === 1 ? 2.4 : 2, 0, 7).fill('rgba(50,50,62,0.35)');
+      pen.begin().ell(20, 9.6, 8.4, 4.3).fill(1.0);
+      pen.begin().ell(24.6, 8.6, 3.4, 2.5).fill(GLASS);
+      line(14, 15.6, 26, 15.6, '#3a3640', 0.6); line(16.5, 13.4, 16, 15.6, '#3a3640', 0.45); line(23.5, 13.4, 24, 15.6, '#3a3640', 0.45);
+      rbox(16, 12.4, 6, 1.6, 0.6, OLIVE);
+    }],
+    jet: [30, 14, (f) => {
+      if (f !== 1) pen.begin().ell(1.4, 7.2, 1.8, 0.8).fill('#ffb040');
+      pen.begin().moveTo(2.4, 7.6).lineTo(5, 5.6).lineTo(22, 5.3).lineTo(28.6, 7).lineTo(22, 8.8).lineTo(5, 8.8).close().fill(1.0);
+      pen.begin().ell(21, 5.7, 3, 1.4).fill(GLASS);
+      poly([3, 6, 4.4, 1.8, 8, 1.8, 8.2, 6], 0.85);
+      poly([10, 7.6, 17, 7.6, 12.4, 12.8, 8.2, 12.8], 0.8);
+      pen.begin().ell(13.4, 10.6, 2.2, 0.7).fill('#3a3a3a');
+    }],
+  };
+
+  // ==================================================================== modern buildings
+  function sandbags(x0, y0, w, rows) {
+    for (let r = 0; r < rows; r++) for (let xx = x0 + (r % 2) * 1.6; xx < x0 + w - 1; xx += 3.2) pen.begin().rrect(xx, y0 - r * 1.8, 3, 2, 0.9).fill('#cdb98c').stroke('#9e8b62', 0.25);
+  }
   const BUILD = {
-    hut(W, H) {
-      ell(W / 2, H - 4.6, 14, 4, 'rgba(0,0,0,0.3)');
-      // mud wall
-      rbox(W / 2 - 10, H - 17, 20, 12, 3, '#c49a6c');
-      line(W / 2 - 10, H - 11, W / 2 + 10, H - 11, '#a77c50', 0.4);
-      rbox(W / 2 - 2.2, H - 12, 4.4, 7, 2, '#4a3220');
-      // straw roof
-      poly([W / 2 - 14, H - 15, W / 2, H - 31, W / 2 + 14, H - 15], '#d9b45a', '#a8833a', 0.5);
-      for (let i = -12; i <= 12; i += 3) line(W / 2 + i, H - 15.4, W / 2 + i * 0.2, H - 28, '#b8903e', 0.3);
-      // team band
-      poly([W / 2 - 9, H - 21.5, W / 2 + 9, H - 21.5, W / 2 + 10.4, H - 19.5, W / 2 - 10.4, H - 19.5], 1.0);
-      flag(W / 2 + 10, H - 6, 18, 0.9);
+    bunker(W, H) {
+      ell(W / 2, H - 4.5, 17, 4, 'rgba(0,0,0,0.18)');
+      pen.begin().moveTo(4, H - 5).quad(W / 2, H - 30, W - 4, H - 5).close().fill('#b9b6ae');
+      pen.begin().moveTo(9, H - 9).quad(W / 2, H - 25, W - 9, H - 9).close().fill('#c9c6be');
+      rbox(W / 2 - 7, H - 15, 14, 2.4, 1, '#2a2622');
+      line(W / 2 - 9, H - 19, W / 2 + 9, H - 19, 1.0, 1.0);
+      sandbags(3, H - 5, W - 6, 2);
+      flag(W / 2 + 10, H - 18, 9, 0.9);
+    },
+    turret(W, H) {
+      ell(W / 2, H - 3.5, 9, 2.6, 'rgba(0,0,0,0.18)');
+      rbox(W / 2 - 6, H - 8, 12, 5, 1, '#b4b1aa');
+      line(W / 2, H - 8, W / 2, H - 12, '#555', 1.0);
+      rbox(W / 2 - 4.5, H - 16.5, 9, 5.4, 1.8, 1.0);
+      circ(W / 2 - 1, H - 13.8, 1, '#ff5040');
+      line(W / 2 + 3, H - 14, W / 2 + 9.6, H - 14.8, STEEL, 1.0);
+    },
+    sam(W, H) {
+      ell(W / 2, H - 4, 13, 3.4, 'rgba(0,0,0,0.18)');
+      rbox(3, H - 9, W - 6, 4.5, 1, OLIVE);
+      line(4, H - 7, W - 4, H - 7, 1.0, 0.8);
+      pen.begin().moveTo(6, H - 9).lineTo(20, H - 20).lineTo(23, H - 17).lineTo(10, H - 9).close().fill(OLIVE_D);
+      for (let k = 0; k < 3; k++) { line(8 + k * 2.2, H - 12 + k * 0.9, 21 + k * 1.2, H - 22.5 + k * 1.6, '#f2f2ee', 1.1); circ(21 + k * 1.2, H - 22.5 + k * 1.6, 0.6, '#d33'); }
+      line(W - 6, H - 9, W - 6, H - 20, '#555', 0.6);
+      pen.begin().ell(W - 6, H - 21, 2.8, 1.2).fill('#c3c9d0');
     },
     barracks(W, H) {
-      ell(W / 2, H - 6.5, 24, 6, 'rgba(0,0,0,0.3)');
-      box(W / 2 - 21, H - 23, 42, 17, '#d8c8a4');
-      for (let i = -21; i <= 21; i += 7) line(W / 2 + i, H - 23, W / 2 + i, H - 6, '#7a5532', 0.9);
-      line(W / 2 - 21, H - 15, W / 2 + 21, H - 15, '#7a5532', 0.8);
-      poly([W / 2 - 24, H - 22, W / 2 - 18, H - 36, W / 2 + 18, H - 36, W / 2 + 24, H - 22], 0.95, '#3a2a1a', 0.5);
-      for (let i = -16; i <= 16; i += 4) line(W / 2 + i * 1.15, H - 22.4, W / 2 + i, H - 35.6, 0.75, 0.3);
-      rbox(W / 2 - 3.5, H - 15, 7, 9, 1.5, '#4a3220');
-      box(W / 2 - 15, H - 20, 4, 3.4, '#3a3a44'); box(W / 2 + 11, H - 20, 4, 3.4, '#3a3a44');
-      // weapon rack
-      line(W / 2 + 15, H - 6, W / 2 + 15, H - 13, '#555', 0.5); line(W / 2 + 17, H - 6, W / 2 + 17.6, H - 13, '#555', 0.5);
-      flag(W / 2 - 18, H - 35, 9, 1);
+      ell(W / 2, H - 6, 24, 5, 'rgba(0,0,0,0.18)');
+      box(W / 2 - 21, H - 21, 42, 15, '#e9e4d8');
+      poly([W / 2 - 23, H - 20, W / 2 - 21, H - 28, W / 2 + 21, H - 28, W / 2 + 23, H - 20], 0.95);
+      for (let k = -3; k <= 3; k++) if (k) box(W / 2 + k * 5.6 - 1.6, H - 17.5, 3.2, 2.6, GLASS);
+      rbox(W / 2 - 2.6, H - 14, 5.2, 8, 0.8, '#6b6b70');
+      sandbags(W / 2 - 22, H - 5, 14, 1); sandbags(W / 2 + 8, H - 5, 14, 1);
+      flag(W / 2 + 16, H - 28, 8, 1);
     },
-    range(W, H) {
-      ell(W / 2, H - 5.6, 21, 5, 'rgba(0,0,0,0.3)');
-      // tent
-      poly([W / 2 - 16, H - 6, W / 2 - 4, H - 30, W / 2 + 8, H - 6], 1.0, '#3a2a1a', 0.4);
-      poly([W / 2 - 10, H - 6, W / 2 - 4, H - 30, W / 2 + 2, H - 6], '#f0e8d4');
-      poly([W / 2 - 6.5, H - 6, W / 2 - 4, H - 14, W / 2 - 1.5, H - 6], '#3a2a1a');
-      line(W / 2 - 4, H - 30, W / 2 - 4, H - 33, '#5b4a3a', 0.5);
-      // target
-      line(W / 2 + 12, H - 6, W / 2 + 13, H - 14, WOOD_D, 0.8); line(W / 2 + 18, H - 6, W / 2 + 17, H - 14, WOOD_D, 0.8);
-      circ(W / 2 + 15, H - 16, 5, '#f4efe2'); circ(W / 2 + 15, H - 16, 3.5, '#d33'); circ(W / 2 + 15, H - 16, 2, '#f4efe2'); circ(W / 2 + 15, H - 16, 0.8, '#d33');
-      line(W / 2 + 14, H - 16.5, W / 2 + 17.5, H - 18.5, '#5b4a3a', 0.3);
-      flag(W / 2 - 4, H - 30, 6, 0.9);
+    factory(W, H) {
+      ell(W / 2, H - 7, 29, 6, 'rgba(0,0,0,0.18)');
+      box(W / 2 - 26, H - 26, 52, 20, '#c9c6bf');
+      for (let k = 0; k < 4; k++) poly([W / 2 - 26 + k * 13, H - 26, W / 2 - 26 + k * 13, H - 35, W / 2 - 13 + k * 13, H - 26], 0.92);
+      box(W / 2 + 14, H - 44, 5, 18, '#9a978f'); box(W / 2 + 13.4, H - 45.6, 6.2, 2.2, '#5a5850');
+      box(W / 2 - 15, H - 20, 20, 14, '#f0c43a');
+      for (let k = 0; k < 6; k++) line(W / 2 - 15, H - 18 + k * 2.2, W / 2 + 5, H - 18 + k * 2.2, '#3a3630', 0.6);
+      box(W / 2 + 9, H - 20, 10, 5, GLASS);
+      flag(W / 2 - 22, H - 26, 9, 1);
     },
-    stable(W, H) {
-      ell(W / 2, H - 6.5, 24, 6, 'rgba(0,0,0,0.3)');
-      box(W / 2 - 20, H - 22, 30, 16, '#9a5a32');
-      for (let i = -20; i <= 10; i += 2.5) line(W / 2 + i, H - 22, W / 2 + i, H - 6, '#7d4524', 0.3);
-      poly([W / 2 - 22, H - 21, W / 2 - 5, H - 36, W / 2 + 12, H - 21], 0.9, '#3a2a1a', 0.5);
-      rbox(W / 2 - 10, H - 17, 9, 11, 1, '#5b3420');
-      line(W / 2 - 10, H - 17, W / 2 - 1, H - 6, '#e8dcc0', 0.6); line(W / 2 - 1, H - 17, W / 2 - 10, H - 6, '#e8dcc0', 0.6);
-      // fence
-      for (let i = 0; i < 4; i++) line(W / 2 + 12 + i * 3.2, H - 6, W / 2 + 12 + i * 3.2, H - 12, '#c8a070', 0.6);
-      line(W / 2 + 11, H - 10.5, W / 2 + 22, H - 10.5, '#c8a070', 0.5); line(W / 2 + 11, H - 8, W / 2 + 22, H - 8, '#c8a070', 0.5);
-      ell(W / 2 + 15, H - 7, 3, 1.5, '#e0c060');
-      flag(W / 2 - 5, H - 35, 7, 1);
+    helipad(W, H) {
+      ell(W / 2 - 3, H - 11, 19, 8.6, '#8f8f8b');
+      pen.begin().ell(W / 2 - 3, H - 11, 15, 6.6).stroke(1.0, 1.4);
+      line(W / 2 - 8, H - 15, W / 2 - 8, H - 7, '#fff', 1.4); line(W / 2 + 2, H - 15, W / 2 + 2, H - 7, '#fff', 1.4); line(W / 2 - 8, H - 11, W / 2 + 2, H - 11, '#fff', 1.4);
+      box(W - 9, H - 24, 6, 14, '#d9d6cf'); box(W - 10, H - 26.5, 8, 3, GLASS); line(W - 6, H - 26.5, W - 6, H - 31, '#555', 0.5);
+      poly([W - 6, H - 31, W - 1.5, H - 30.2, W - 6, H - 29.4], '#ff8c2a');
     },
-    workshop(W, H) {
-      ell(W / 2, H - 6.5, 24, 6, 'rgba(0,0,0,0.3)');
-      box(W / 2 - 18, H - 20, 28, 14, '#a58258');
-      for (let i = -18; i <= 10; i += 3) line(W / 2 + i, H - 20, W / 2 + i, H - 6, '#80613c', 0.3);
-      poly([W / 2 - 20, H - 19, W / 2 - 4, H - 31, W / 2 + 12, H - 19], 0.88, '#3a2a1a', 0.5);
-      rbox(W / 2 - 8, H - 15, 10, 9, 1, '#4a3220');
-      // crane
-      line(W / 2 + 14, H - 6, W / 2 + 14, H - 32, WOOD_D, 1.2);
-      line(W / 2 + 14, H - 31, W / 2 + 4, H - 33, WOOD_D, 1.0);
-      line(W / 2 + 5, H - 33, W / 2 + 5, H - 25, '#444', 0.25);
-      box(W / 2 + 3.6, H - 25, 2.8, 2.4, '#777');
-      // gear
-      circ(W / 2 + 19, H - 10, 3, '#6a6f74'); circ(W / 2 + 19, H - 10, 1.2, '#3a3d40');
-      wheel(W / 2 - 16, H - 4.5, 2.4);
-      flag(W / 2 - 4, H - 30.5, 6, 0.9);
+    dronebase(W, H) {
+      ell(W / 2, H - 5, 16, 3.6, 'rgba(0,0,0,0.18)');
+      box(W / 2 - 14, H - 17, 28, 12, 0.92);
+      for (let k = -12; k <= 12; k += 3) line(W / 2 + k, H - 17, W / 2 + k, H - 5, 0.75, 0.35);
+      line(W / 2 + 10, H - 17, W / 2 + 10, H - 30, '#555', 0.6); pen.begin().ell(W / 2 + 10, H - 30, 2.6, 1.1).fill('#c3c9d0');
+      for (const xx of [-8, -1]) { line(W / 2 + xx - 3, H - 19, W / 2 + xx + 3, H - 19, '#3a3640', 0.5); rbox(W / 2 + xx - 1.5, H - 19.6, 3, 1.6, 0.5, '#3a3640'); }
     },
-    tower(W, H) {
-      ell(W / 2, H - 4, 11, 3.2, 'rgba(0,0,0,0.3)');
-      stoneRect(W / 2 - 8, H - 40, 16, 36, '#a7a197', '#7f796f');
-      box(W / 2 - 8, H - 40, 3, 36, 'rgba(255,255,255,0.12)');
-      box(W / 2 + 5, H - 40, 3, 36, 'rgba(0,0,0,0.15)');
-      box(W / 2 - 10, H - 43, 20, 4, '#b8b2a8');
-      crenel(W / 2 - 10, H - 43, 20, '#b8b2a8');
-      rbox(W / 2 - 1.5, H - 30, 3, 6, 1.5, '#2a2622');
-      rbox(W / 2 - 2.2, H - 11, 4.4, 7, 2, '#4a3220');
-      box(W / 2 - 9.6, H - 39, 19.2, 2.2, 0.9);
-      flag(W / 2, H - 44, 9, 1);
+    hospital(W, H) {
+      ell(W / 2, H - 5, 20, 4.4, 'rgba(0,0,0,0.18)');
+      pen.begin().moveTo(W / 2 - 19, H - 5).lineTo(W / 2 - 19, H - 16).quad(W / 2, H - 32, W / 2 + 19, H - 16).lineTo(W / 2 + 19, H - 5).close().fill('#f4f2ec');
+      line(W / 2 - 19, H - 16, W / 2 + 19, H - 16, '#d6d3cb', 0.6);
+      circ(W / 2, H - 19, 5, '#fff'); box(W / 2 - 1.2, H - 23, 2.4, 8, '#d33'); box(W / 2 - 4, H - 20.2, 8, 2.4, '#d33');
+      rbox(W / 2 - 3, H - 12, 6, 7, 1, '#7a8088');
+      flag(W / 2 + 15, H - 16, 8, 0.9);
     },
-    magetower(W, H) {
-      ell(W / 2, H - 4, 11, 3.2, 'rgba(0,0,0,0.3)');
-      stoneRect(W / 2 - 7.5, H - 38, 15, 34, '#8a8296', '#625a70');
-      box(W / 2 + 4.5, H - 38, 3, 34, 'rgba(0,0,0,0.15)');
-      box(W / 2 - 9, H - 40, 18, 3, '#9a92a8');
-      poly([W / 2 - 9, H - 40, W / 2, H - 56, W / 2 + 9, H - 40], 0.95, '#3a2a4a', 0.4);
-      circ(W / 2, H - 57, 1.6, '#ffb24a');
-      soft('rgba(255,180,80,0.9)', 'rgba(255,120,40,0)', 4, W / 2, H - 57);
-      rbox(W / 2 - 1.6, H - 30, 3.2, 5, 1.6, '#ffb24a');
-      rbox(W / 2 - 1.6, H - 20, 3.2, 5, 1.6, '#ffb24a');
-      rbox(W / 2 - 2.2, H - 11, 4.4, 7, 2, '#3a2a4a');
-    },
-    bastion(W, H) {
-      ell(W / 2, H - 5, 15, 4, 'rgba(0,0,0,0.3)');
-      poly([W / 2 - 14, H - 6, W / 2 - 12, H - 20, W / 2 + 12, H - 20, W / 2 + 14, H - 6], '#9b968c');
-      stoneRect(W / 2 - 12.6, H - 19, 25.2, 13, '#9b968c', '#77726a');
-      box(W / 2 - 13, H - 22, 26, 3, '#b0aaa0');
-      crenel(W / 2 - 13, H - 22, 26, '#b0aaa0');
-      // cannon
-      pen.begin().moveTo(W / 2 - 1, H - 23).lineTo(W / 2 + 12, H - 25.5).lineTo(W / 2 + 12.4, H - 23).lineTo(W / 2 - 1, H - 20.5).close().fill('#2c2f33');
-      box(W / 2 - 12.6, H - 17, 25.2, 2, 0.9);
-      flag(W / 2 - 8, H - 22, 8, 1);
-    },
-    temple(W, H) {
-      ell(W / 2, H - 5.6, 21, 5, 'rgba(0,0,0,0.3)');
-      box(W / 2 - 18, H - 8, 36, 3, '#d8d2c4'); box(W / 2 - 16, H - 10, 32, 2.4, '#e8e2d4');
-      box(W / 2 - 14, H - 28, 28, 18, '#f2ede0');
-      for (let i = 0; i < 5; i++) { box(W / 2 - 13 + i * 6, H - 27, 2.6, 17, '#fbf8f0'); line(W / 2 - 13 + i * 6 + 2.6, H - 27, W / 2 - 13 + i * 6 + 2.6, H - 10, '#cfc8b8', 0.4); }
-      box(W / 2 - 16, H - 31, 32, 3, '#e8e2d4');
-      poly([W / 2 - 17, H - 31, W / 2, H - 41, W / 2 + 17, H - 31], '#f6f2e8', '#bdb5a2', 0.4);
-      poly([W / 2 - 11, H - 32.2, W / 2, H - 38.6, W / 2 + 11, H - 32.2], 1.0);
-      circ(W / 2, H - 35, 1.4, '#ffe680');
-      soft('rgba(160,255,170,0.6)', 'rgba(160,255,170,0)', 6, W / 2, H - 20);
-    },
-    castle(W, H) {
+    hq(W, H) {
       const cx = W / 2;
-      ell(cx, H - 10, 50, 12, 'rgba(0,0,0,0.32)');
-      // back wall
-      stoneRect(cx - 36, H - 60, 72, 12, '#958f84', '#726c62'); crenel(cx - 36, H - 60, 72, '#958f84');
-      // keep
-      stoneRect(cx - 15, H - 82, 30, 40, '#aaa398', '#837d72');
-      box(cx + 10, H - 82, 5, 40, 'rgba(0,0,0,0.15)');
-      box(cx - 17, H - 85, 34, 4, '#bdb6aa'); crenel(cx - 17, H - 85, 34, '#bdb6aa');
-      box(cx - 15, H - 80, 30, 3, 0.9);
-      rbox(cx - 2, H - 72, 4, 7, 2, '#2a2622'); rbox(cx - 9, H - 66, 3, 5, 1.5, '#2a2622'); rbox(cx + 6, H - 66, 3, 5, 1.5, '#2a2622');
-      flag(cx, H - 86, 14, 1.6);
-      // side walls
-      stoneRect(cx - 40, H - 40, 12, 26, '#a39d92', '#7c766c');
-      stoneRect(cx + 28, H - 40, 12, 26, '#a39d92', '#7c766c');
-      // front wall
-      stoneRect(cx - 36, H - 34, 72, 22, '#aea79c', '#888276');
-      box(cx - 36, H - 37, 72, 3, '#c0b9ad'); crenel(cx - 36, H - 37, 72, '#c0b9ad');
-      box(cx - 36, H - 32, 72, 2, 0.85);
-      // gate
-      pen.begin().moveTo(cx - 7, H - 12).lineTo(cx - 7, H - 24).arc(cx, H - 24, 7, Math.PI, 0).lineTo(cx + 7, H - 12).close().fill('#3a2a1c');
-      for (let i = -5; i <= 5; i += 2.5) line(cx + i, H - 29, cx + i, H - 12, '#6a6f74', 0.45);
-      line(cx - 7, H - 20, cx + 7, H - 20, '#6a6f74', 0.4); line(cx - 7, H - 16, cx + 7, H - 16, '#6a6f74', 0.4);
-      // banners on front wall
-      poly([cx - 26, H - 32, cx - 20, H - 32, cx - 20, H - 20, cx - 23, H - 22.5, cx - 26, H - 20], 1.0);
-      poly([cx + 20, H - 32, cx + 26, H - 32, cx + 26, H - 20, cx + 23, H - 22.5, cx + 20, H - 20], 1.0);
-      // 4 towers
-      const tower = (tx, ty, h) => {
-        stoneRect(tx - 7, ty - h, 14, h, '#b3aca0', '#8a8478');
-        box(tx + 4, ty - h, 3, h, 'rgba(0,0,0,0.14)');
-        poly([tx - 8.5, ty - h, tx, ty - h - 14, tx + 8.5, ty - h], 0.95, '#3a2a1a', 0.4);
-        rbox(tx - 1.2, ty - h + 5, 2.4, 4, 1.2, '#2a2622');
-        line(tx, ty - h - 14, tx, ty - h - 18, '#5b4a3a', 0.4);
-        poly([tx, ty - h - 18, tx + 4, ty - h - 17, tx, ty - h - 15.6], 1.0);
-      };
-      tower(cx - 38, H - 48, 22); tower(cx + 38, H - 48, 22);
-      tower(cx - 40, H - 10, 32); tower(cx + 40, H - 10, 32);
+      ell(cx, H - 9, 44, 10, 'rgba(0,0,0,0.18)');
+      box(cx - 36, H - 46, 72, 38, '#d4d1c9');
+      box(cx - 36, H - 46, 72, 4, '#bcb9b1');
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 9; c++) box(cx - 32 + c * 7.6, H - 39 + r * 9, 4.4, 4.6, GLASS);
+      box(cx - 36, H - 14, 72, 3, 1.0);
+      rbox(cx - 6, H - 20, 12, 12, 1, '#6b6b70');
+      box(cx - 24, H - 58, 18, 12, '#c4c1b9'); pen.begin().arc(cx + 14, H - 50, 9, Math.PI, 0).fill('#eceae4');
+      line(cx - 28, H - 46, cx - 28, H - 66, '#555', 0.6); line(cx - 30, H - 60, cx - 26, H - 60, '#555', 0.5);
+      flag(cx - 10, H - 58, 10, 1.4); flag(cx + 30, H - 46, 9, 1.2);
+      sandbags(cx - 40, H - 6, 30, 2); sandbags(cx + 10, H - 6, 30, 2);
     },
-    tent(W, H) {
-      ell(W / 2, H - 4.6, 14, 4, 'rgba(0,0,0,0.3)');
-      poly([W / 2 - 13, H - 6, W / 2, H - 26, W / 2 + 13, H - 6], 1.0, '#3a2a1a', 0.4);
-      poly([W / 2 - 7, H - 6, W / 2, H - 26, W / 2 - 2, H - 6], '#f0e8d4');
-      poly([W / 2 + 7, H - 6, W / 2, H - 26, W / 2 + 4, H - 6], '#f0e8d4');
-      poly([W / 2 - 2.5, H - 6, W / 2, H - 13, W / 2 + 2.5, H - 6], '#2a1a10');
-      flag(W / 2, H - 26, 7, 1.1);
-      circ(W / 2 + 10, H - 8, 1.6, '#c9a43a');
+    mine(W, H) {
+      pen.begin().ell(W / 2, H - 2.6, 3.6, 1.8).fill('#4a4d44');
+      pen.begin().ell(W / 2, H - 3.2, 2.2, 1).fill(0.9);
+      circ(W / 2, H - 3.4, 0.5, '#ff4030');
     },
-    barrel(W, H) {
-      ell(W / 2, H - 1.8, 4.2, 1.3, 'rgba(0,0,0,0.3)');
-      rbox(W / 2 - 3.6, H - 10, 7.2, 8.4, 2, '#9a6232');
-      line(W / 2 - 3.6, H - 8, W / 2 + 3.6, H - 8, '#3a3a3a', 0.6); line(W / 2 - 3.6, H - 3.6, W / 2 + 3.6, H - 3.6, '#3a3a3a', 0.6);
-      line(W / 2 - 1.5, H - 7, W / 2 + 1.5, H - 4.6, '#d22', 0.6); line(W / 2 + 1.5, H - 7, W / 2 - 1.5, H - 4.6, '#d22', 0.6);
-      ell(W / 2, H - 10, 3.6, 1, '#b07a44');
+    fuel(W, H) {
+      ell(W / 2, H - 3, 11, 2.6, 'rgba(0,0,0,0.18)');
+      for (const xx of [-5, 5]) {
+        rbox(W / 2 + xx - 4.5, H - 19, 9, 16, 2.5, '#eeeae2');
+        box(W / 2 + xx - 4.5, H - 13, 9, 2.2, '#e0452f');
+        pen.begin().ell(W / 2 + xx, H - 19, 4.5, 1.3).fill('#d8d4ca');
+      }
+      poly([W / 2, H - 9, W / 2 + 2.2, H - 6, W / 2 - 2.2, H - 6], '#f2c230');
     },
   };
-  // building frame sizes (world)
   const BSIZE = {
-    hut: [34, 36, 13], barracks: [52, 42, 20], range: [46, 40, 17], stable: [52, 42, 20], workshop: [52, 40, 20],
-    tower: [26, 56, 10], magetower: [26, 62, 10], bastion: [34, 36, 13], temple: [44, 46, 17],
-    castle: [116, 120, 40], tent: [32, 36, 12], barrel: [10, 12, 4],
+    bunker: [36, 30, 13], turret: [22, 22, 7], sam: [30, 30, 11], barracks: [52, 34, 20], factory: [62, 50, 24],
+    helipad: [48, 34, 18], dronebase: [38, 34, 14], hospital: [44, 36, 17], hq: [92, 72, 34], mine: [9, 6, 3], fuel: [24, 24, 8],
   };
 
   // ==================================================================== build atlas
@@ -667,6 +775,18 @@
         const pv = (h - r * 0.62) / h;
         const fi = frame('b_' + u.k, w, h, 0.5, pv, () => BUILD[u.k](w, h));
         G.unitFrames[u.id * 3] = G.unitFrames[u.id * 3 + 1] = G.unitFrames[u.id * 3 + 2] = fi;
+      } else if (u.cat === 'veh') {
+        const [w, h, g, fn] = VEH[u.k];
+        for (let f = 0; f < 3; f++) {
+          const fi = frame('v_' + u.k + f, w, h, 0.5, g / h, () => { ell(w / 2, g - 0.3, w * 0.44, 1.8, 'rgba(0,0,0,0.2)'); fn(f); });
+          G.unitFrames[u.id * 3 + f] = fi;
+        }
+      } else if (u.cat === 'air') {
+        const [w, h, fn] = AIRC[u.k];
+        for (let f = 0; f < 3; f++) {
+          const fi = frame('a_' + u.k + f, w, h, 0.5, 0.5, () => fn(f));
+          G.unitFrames[u.id * 3 + f] = fi;
+        }
       } else if (u.cat === 'siege') {
         for (let f = 0; f < 3; f++) {
           const fi = frame('s_' + u.k + f, 26, 22, 0.5, 19.6 / 22, () => siege(u.k, f));
@@ -721,27 +841,22 @@
       else { poly([0.8, 7.6, 2.4, 2.4, 6.4, 1.2, 9.2, 4.6, 9, 7.6], '#85827b'); poly([2.4, 2.4, 6.4, 1.2, 9.2, 4.6, 5.4, 4], '#aaa79e'); circ(3, 6, 0.6, '#6a6862'); }
     }, false, true);
     frame('wall', 8.6, 13, 0.5, 9 / 13, () => {
-      box(0, 3.4, 8.6, 9, '#8c877d'); // front face
-      line(0, 6.4, 8.6, 6.4, '#6d6960', 0.25); line(0, 9.4, 8.6, 9.4, '#6d6960', 0.25);
-      line(4, 3.4, 4, 6.4, '#6d6960', 0.25); line(1.8, 6.4, 1.8, 9.4, '#6d6960', 0.25); line(6.4, 6.4, 6.4, 9.4, '#6d6960', 0.25); line(4, 9.4, 4, 12.4, '#6d6960', 0.25);
-      box(0, 0, 8.6, 3.6, '#b4afa4'); // top
-      box(0, 12, 8.6, 1, 'rgba(0,0,0,0.25)');
+      box(0, 3.4, 8.6, 9, '#b9b7b1');
+      box(0, 0, 8.6, 3.6, '#dad8d2');
+      line(4.3, 3.4, 4.3, 12.4, '#a19f99', 0.25);
+      circ(2, 6, 0.3, '#9a9892'); circ(6.6, 9.4, 0.3, '#9a9892');
     }, false, true);
     frame('wallcr', 8.6, 13, 0.5, 9 / 13, () => {
-      box(0, 3.4, 8.6, 9, '#7d786f'); box(0, 0, 8.6, 3.6, '#9d988e');
-      line(1, 4, 4, 9, '#3a3630', 0.4); line(4, 9, 3, 12, '#3a3630', 0.35); line(6, 2, 7.6, 7, '#3a3630', 0.35);
+      box(0, 3.4, 8.6, 9, '#a9a7a1'); box(0, 0, 8.6, 3.6, '#c8c6c0');
+      line(1, 4, 4, 9, '#4a4640', 0.4); line(4, 9, 3, 12, '#4a4640', 0.35); line(6, 2, 7.6, 7, '#4a4640', 0.35);
     }, false, true);
-    frame('pali', 8.4, 14, 0.5, 11 / 14, () => {
-      ell(4.2, 11.4, 4.4, 1.2, 'rgba(0,0,0,0.25)');
-      for (let i = 0; i < 3; i++) {
-        const x0 = 0.4 + i * 2.7;
-        poly([x0, 11.6, x0, 3, x0 + 1.25, 0.8 + (i % 2), x0 + 2.5, 3, x0 + 2.5, 11.6], i % 2 ? '#8a6038' : '#9a6c40');
-        line(x0 + 2.5, 3, x0 + 2.5, 11.6, '#5e3b1b', 0.25);
-      }
-      line(0, 6, 8.4, 6, '#5e3b1b', 0.5);
+    frame('pali', 8.6, 10, 0.5, 7.5 / 10, () => {
+      for (let r = 0; r < 3; r++) for (let k = 0; k < 2; k++) pen.begin().rrect(0.2 + k * 4.2 - (r % 2) * 1.6 + 0.8, 6.6 - r * 2.4, 4, 2.6, 1.1).fill('#d2bf92').stroke('#9e8b62', 0.3);
     }, false, true);
-    frame('spikes', 8, 6, 0.5, 4.5 / 6, () => {
-      for (let i = 0; i < 4; i++) { const x0 = 0.6 + i * 1.9 + (i % 2) * 0.3; poly([x0, 5, x0 + 0.8, 0.6 + (i % 2), x0 + 1.6, 5], '#7a5a34'); poly([x0 + 0.5, 2.4, x0 + 0.8, 0.6 + (i % 2), x0 + 1.1, 2.4], '#ddd'); }
+    frame('spikes', 8, 7, 0.5, 5.5 / 7, () => {
+      line(0.8, 6, 0.8, 1, '#6b5a44', 0.5); line(7.2, 6, 7.2, 1, '#6b5a44', 0.5);
+      pen.begin(); cb.lineWidth = cm.lineWidth = 0.3;
+      for (let k = 0; k < 3; k++) { cb.beginPath(); for (let xx = 0; xx <= 8; xx += 0.5) { const yy = 2 + k * 1.4 + Math.sin(xx * 2.2 + k) * 0.7; xx === 0 ? cb.moveTo(xx, yy) : cb.lineTo(xx, yy); } cb.strokeStyle = '#55575c'; cb.stroke(); }
     }, false, 'thin');
 
     // ------------------------------------------------ projectiles (pivot centre, pointing +x)
@@ -755,6 +870,11 @@
     frame('bbolt', 16, 3, 0.5, 0.5, () => { line(0.6, 1.5, 13.6, 1.5, '#5a4030', 1.0); poly([13, 0.2, 16, 1.5, 13, 2.8], '#c8ced4'); poly([0.4, 0.2, 3, 1.5, 0.4, 2.8], 0.9); }, false, 'thin');
     frame('ball', 4, 4, 0.5, 0.5, () => { circ(2, 2, 1.7, '#1f2124'); circ(1.4, 1.4, 0.5, '#5a5e64'); }, false, 'thin');
     frame('shuriken', 4, 4, 0.5, 0.5, () => { poly([2, 0, 2.6, 1.4, 4, 2, 2.6, 2.6, 2, 4, 1.4, 2.6, 0, 2, 1.4, 1.4], '#c9d0d6'); circ(2, 2, 0.4, '#333'); }, false, 'thin');
+    frame('rocket', 10, 3, 0.5, 0.5, () => { rbox(1, 0.9, 7, 1.2, 0.5, '#5a6046'); poly([8, 0.7, 10, 1.5, 8, 2.3], '#3c4030'); poly([1, 0.4, 2.4, 1.5, 1, 2.6], '#3c4030'); }, false, 'thin');
+    frame('missile', 13, 3, 0.5, 0.5, () => { rbox(1, 0.9, 10, 1.2, 0.5, '#f2f2ee'); poly([11, 0.8, 13, 1.5, 11, 2.2], '#d33'); poly([1, 0.2, 3, 1.5, 1, 2.8], '#9a9a9a'); }, false, 'thin');
+    frame('shell', 6, 3, 0.5, 0.5, () => { rbox(0.6, 0.6, 4, 1.8, 0.6, '#c9a43a'); poly([4.4, 0.6, 6, 1.5, 4.4, 2.4], '#5a5a5a'); }, false, 'thin');
+    frame('mrl', 8, 2.4, 0.5, 0.5, () => { rbox(0.8, 0.7, 5.6, 1, 0.4, '#f0eee6'); poly([6.2, 0.5, 8, 1.2, 6.2, 1.9], '#d33'); }, false, 'thin');
+    frame('bomb', 7, 4, 0.5, 0.5, () => { pen.begin().ell(4, 2, 2.6, 1.4).fill('#3a3a3a'); poly([0.4, 0.6, 1.8, 2, 0.4, 3.4], '#3a3a3a'); }, false, 'thin');
     // ------------------------------------------------ fx
     frame('flame', 8, 8, 0.5, 0.5, () => { soft('rgba(255,240,170,1)', 'rgba(255,90,10,0)', 4, 4, 4); }, false);
     frame('smoke', 10, 10, 0.5, 0.5, () => { const g = cb.createRadialGradient(5, 5, 0, 5, 5, 4.8); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.7, 'rgba(255,255,255,0.95)'); g.addColorStop(1, 'rgba(255,255,255,0)'); cb.fillStyle = g; cb.beginPath(); cb.arc(5, 5, 4.8, 0, 7); cb.fill(); }, false);
@@ -770,7 +890,7 @@
       for (let i = 0; i < 7; i++) { const a = i * 0.9, d = i === 0 ? 0 : 1.2 + (i % 3); cb.beginPath(); cb.arc(4 + Math.cos(a) * d, 4 + Math.sin(a) * d * 0.6, i === 0 ? 2 : 0.8 + (i % 2) * 0.5, 0, 7); cb.fill(); }
     }, false);
     frame('scorch', 16, 16, 0.5, 0.5, () => { soft('rgba(110,92,74,0.3)', 'rgba(110,92,74,0)', 8, 8, 8); }, false);
-    frame('crater', 16, 12, 0.5, 0.5, () => { cb.fillStyle = 'rgba(40,34,26,0.55)'; cb.beginPath(); cb.ellipse(8, 6, 7.5, 5, 0, 0, 7); cb.fill(); cb.fillStyle = 'rgba(20,16,12,0.5)'; cb.beginPath(); cb.ellipse(8, 6.4, 4.5, 3, 0, 0, 7); cb.fill(); }, false);
+    frame('crater', 16, 12, 0.5, 0.5, () => { cb.fillStyle = 'rgba(120,104,84,0.3)'; cb.beginPath(); cb.ellipse(8, 6, 7.5, 5, 0, 0, 7); cb.fill(); cb.fillStyle = 'rgba(90,76,60,0.3)'; cb.beginPath(); cb.ellipse(8, 6.4, 4.5, 3, 0, 0, 7); cb.fill(); }, false);
     frame('rubble', 20, 14, 0.5, 0.5, () => {
       for (let i = 0; i < 26; i++) { const a = i * 2.39, d = Math.sqrt(i / 26) * 8; const x = 10 + Math.cos(a) * d, y = 7 + Math.sin(a) * d * 0.6; cb.fillStyle = ['#8a8478', '#6e695f', '#a39d92', '#5e4a36'][i % 4]; cb.beginPath(); cb.arc(x, y, 1 + (i % 3) * 0.5, 0, 7); cb.fill(); }
     }, false);

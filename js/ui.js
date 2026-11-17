@@ -8,7 +8,7 @@
   const $ = (s) => document.querySelector(s);
   const ui = (G.ui = {
     opts: { bars: false },
-    tool: { kind: 'unit', id: G.U.soldier },
+    tool: { kind: 'unit', id: G.U.rifle },
     brush: 26,
     running: false,
     speed: 1,
@@ -19,10 +19,10 @@
 
   // ------------------------------------------------------------------ tabs
   const TABS = [
-    { name: 'Armée', items: ['peasant', 'soldier', 'spear', 'shield', 'knight', 'barbarian', 'berserk', 'king', 'cavalry'] },
-    { name: 'Tireurs', items: ['archer', 'xbow', 'javelin', 'musket', 'sniper', 'grenadier', 'flamer', 'mage', 'harcher'] },
-    { name: 'Spéciaux', items: ['monk', 'drummer', 'ninja', 'sapper', 'catapult', 'ballista', 'cannon', 'ram'] },
-    { name: 'Bâtiments', items: ['hut', 'barracks', 'range', 'stable', 'workshop', 'tent', 'temple', 'tower', 'magetower', 'bastion', 'castle', 'barrel'] },
+    { name: 'Infanterie', items: ['rifle', 'mg', 'sniper', 'rpg', 'grenadier', 'flamer', 'medic', 'officer', 'riot', 'commando', 'sapper'] },
+    { name: 'Véhicules', items: ['jeep', 'apc', 'tank', 'artillery', 'mlrs', 'aa'] },
+    { name: 'Aérien', items: ['fpv', 'bomber', 'heli', 'jet'] },
+    { name: 'Bâtiments', items: ['barracks', 'factory', 'helipad', 'dronebase', 'hospital', 'hq', 'bunker', 'turret', 'sam', 'mine', 'fuel'] },
     { name: 'Terrain', terrain: ['FOREST', 'TALL', 'WATER', 'DEEP', 'MUD', 'SAND', 'ROAD', 'ROCK', 'WALL', 'PALI', 'SPIKES'], tools: ['fire', 'erase'] },
   ];
   const TOOLS = { erase: 'Gomme', fire: 'Feu' };
@@ -148,7 +148,7 @@
     const tool = ui.tool, rb = ui.brush;
     if (tool.kind === 'unit') {
       const t = tool.id, u = G.UNITS[t], r = G.UR[t];
-      if (u.cat === 'build' && !(u.flags & F.NEUTRAL)) {
+      if (u.cat === 'build' && !(u.flags & (F.NEUTRAL | F.MINE))) {
         if (!first && lastBuild && Math.hypot(wx - lastBuild[0], wy - lastBuild[1]) < r * 2 + 6) return;
         if (!freeOcc(wx, wy, r + 2) || S.blockedAt(wx, wy)) return;
         S.spawn(t, teamFor(wx), wx, wy);
@@ -156,7 +156,7 @@
         lastBuild = [wx, wy];
         return;
       }
-      const sp = r * 2 * (u.flags & F.NEUTRAL ? 3 : 1.06);
+      const sp = r * 2 * (u.flags & F.NEUTRAL ? 3 : u.flags & F.MINE ? 4 : u.flags & F.AIR ? 1.5 : 1.06);
       const rowH = sp * 0.866;
       for (let row = Math.floor((wy - rb) / rowH); row <= Math.ceil((wy + rb) / rowH); row++) {
         const yy = row * rowH, off = row & 1 ? sp / 2 : 0;
@@ -164,7 +164,7 @@
           const xx = col * sp + off;
           if ((xx - wx) ** 2 + (yy - wy) ** 2 > rb * rb) continue;
           if (xx < 3 || yy < 3 || xx > S.W - 3 || yy > S.H - 3) continue;
-          if (!freeOcc(xx, yy, r * 0.95) || S.blockedAt(xx, yy)) continue;
+          if (!freeOcc(xx, yy, r * 0.95) || (!(u.flags & F.AIR) && S.blockedAt(xx, yy))) continue;
           if (S.spawn(t, teamFor(xx), xx, yy) < 0) return;
           markOcc(xx, yy, r * 0.95);
         }
@@ -329,7 +329,7 @@
       let r = ui.brush;
       const tool = ui.tool;
       const u = tool.kind === 'unit' ? G.UNITS[tool.id] : null;
-      if (u && u.cat === 'build' && !(u.flags & F.NEUTRAL)) r = G.UR[tool.id];
+      if (u && u.cat === 'build' && !(u.flags & (F.NEUTRAL | F.MINE))) r = G.UR[tool.id];
       if (tool.kind === 'terrain' && (tool.id === T.WALL || tool.id === T.PALI)) r = Math.max(7, Math.min(r, 20));
       const c = u ? G.TEAM_RGB[u.flags & F.NEUTRAL ? 4 : teamFor(wx)] : tool.kind === 'fire' ? [255, 120, 30] : [43, 36, 51];
       ui.brushPreview = { x: wx, y: wy, r, col: G.R.rgba(c[0], c[1], c[2], 255) };

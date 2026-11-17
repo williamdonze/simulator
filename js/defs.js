@@ -29,12 +29,14 @@ const F = (G.F = {
   AURA: 8192, KING: 16384, EXPLODE: 32768, FLAMMABLE: 65536, REPAIR: 1 << 17,
   HEALAURA: 1 << 18, AP: 1 << 19, NEUTRAL: 1 << 20, PREFBUILD: 1 << 21,
   ONLYBUILD: 1 << 22, LIFESTEAL: 1 << 23, FIREPROOF: 1 << 24, MOVESHOOT: 1 << 25,
+  AIR: 1 << 26, VEHICLE: 1 << 27, AAONLY: 1 << 28, CANAIR: 1 << 29, MINE: 1 << 30,
 });
 
 // behaviours
-const B = (G.B = { MELEE: 0, RANGED: 1, CAV: 2, HEAL: 3, SUPPORT: 4, NINJA: 5, SAPPER: 6, RAM: 7, BUILD: 8, PROP: 9 });
+const B = (G.B = { MELEE: 0, RANGED: 1, CAV: 2, HEAL: 3, SUPPORT: 4, NINJA: 5, SAPPER: 6, RAM: 7, BUILD: 8, PROP: 9, DRONEK: 10, DRONEB: 11, JET: 12 });
 // projectiles
-const P = (G.P = { NONE: 0, ARROW: 1, BOLT: 2, BULLET: 3, GRENADE: 4, FIREBALL: 5, FLAME: 6, STONE: 7, BBOLT: 8, CANNON: 9, SHURIKEN: 10, JAVELIN: 11 });
+const P = (G.P = { NONE: 0, ARROW: 1, BOLT: 2, BULLET: 3, GRENADE: 4, FIREBALL: 5, FLAME: 6, STONE: 7, BBOLT: 8, CANNON: 9, SHURIKEN: 10, JAVELIN: 11,
+  ROCKET: 12, MISSILE: 13, SHELL: 14, MRL: 15, BOMB: 16, TSHELL: 17 });
 
 // ---------------------------------------------------------------- terrain
 // block: 0 = walkable, 1 = solid (blocks units & straight shots), 2 = blocks units only
@@ -47,11 +49,11 @@ G.TERRAIN = [
   { k: 'DEEP',     name: 'Eau profonde',   col: [80, 160, 222],   spd: 0.3,  block: 2, fuel: 0,   spread: 0, water: 1, tool: true, desc: 'Infranchissable à pied. Les projectiles passent au-dessus.' },
   { k: 'MUD',      name: 'Boue',           col: [200, 166, 122],   spd: 0.45, block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Englue les troupes, surtout la cavalerie.' },
   { k: 'SAND',     name: 'Sable',          col: [245, 226, 166], spd: 0.8,  block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Léger ralentissement.' },
-  { k: 'ROAD',     name: 'Route',          col: [228, 216, 190], spd: 1.4,  block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Les troupes y marchent 40 % plus vite.' },
+  { k: 'ROAD',     name: 'Route',          col: [196, 196, 192], spd: 1.4,  block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Les troupes y marchent 40 % plus vite.' },
   { k: 'ROCK',     name: 'Rochers',        col: [214, 210, 202], spd: 0,    block: 1, fuel: 0,   spread: 0, tool: true, desc: 'Obstacle indestructible, bloque les tirs tendus.' },
-  { k: 'WALL',     name: 'Mur de pierre',  col: [206, 200, 190], spd: 0,    block: 1, fuel: 0,   spread: 0, hp: 700, tool: true, desc: 'Bloque tout. Les troupes le contournent… ou le démolissent. Les explosions le détruisent.' },
-  { k: 'PALI',     name: 'Palissade',      col: [224, 204, 170],   spd: 0,    block: 1, fuel: 12,  spread: 0.3, hp: 260, tool: true, desc: 'Mur en bois, moins solide et inflammable.' },
-  { k: 'SPIKES',   name: 'Pieux / pièges', col: [236, 230, 208],  spd: 0.6,  block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Blessent toute unité qui les traverse.' },
+  { k: 'WALL',     name: 'Mur de béton',   col: [206, 204, 200], spd: 0,    block: 1, fuel: 0,   spread: 0, hp: 1400, tool: true, desc: 'Bloque tout. Les troupes le contournent… ou le démolissent. Les explosions le détruisent.' },
+  { k: 'PALI',     name: 'Sacs de sable',  col: [226, 214, 180],   spd: 0,    block: 1, fuel: 0,  spread: 0, hp: 500, tool: true, desc: 'Rempart de sacs de sable, moins solide que le béton.' },
+  { k: 'SPIKES',   name: 'Barbelés',       col: [236, 232, 214],  spd: 0.35,  block: 0, fuel: 0,   spread: 0, tool: true, desc: 'Blessent toute unité qui les traverse.' },
   { k: 'BURNT',    name: 'Cendres',        col: [170, 160, 148],    spd: 1.0,  block: 0, fuel: 0,   spread: 0 },
   { k: 'RUBBLE',   name: 'Gravats',        col: [214, 206, 192], spd: 0.7,  block: 0, fuel: 0,   spread: 0 },
 ];
@@ -61,107 +63,74 @@ G.TERRAIN.forEach((t, i) => (T[t.k] = i));
 // r: radius, spd: world units/s, hp, arm: flat armor, dmg, reach (melee range beyond contact),
 // rng: shooting range, minr: min range, cd: seconds between attacks, vis: vision radius
 const UNITS = [
-  // ------------------------------------------------------------- ARMÉE
-  { k: 'peasant', name: 'Paysan', cat: 'army', r: 4, spd: 40, hp: 45, arm: 0, dmg: 6, reach: 2, cd: 1.0, vis: 170, beh: B.MELEE, flags: F.COWARD | F.REPAIR,
-    look: { tunic: 1, pants: '#6b5537', helmet: 'straw', weapon: 'fork' },
-    desc: 'Faible et peureux : fuit quand il est en infériorité. Répare les bâtiments alliés endommagés.' },
-  { k: 'soldier', name: 'Fantassin', cat: 'army', r: 4.5, spd: 42, hp: 110, arm: 1, dmg: 13, reach: 2.5, cd: 0.9, vis: 180, beh: B.MELEE, flags: 0,
-    look: { tunic: 1, helmet: 'kettle', weapon: 'sword', shield: 'small' },
-    desc: 'Épéiste polyvalent. Peut fuir s\'il est submergé et blessé.' },
-  { k: 'spear', name: 'Lancier', cat: 'army', r: 4.5, spd: 40, hp: 105, arm: 1, dmg: 11, reach: 9, cd: 1.0, vis: 180, beh: B.MELEE, flags: F.ANTICAV,
-    look: { tunic: 1, helmet: 'kettle', weapon: 'spear' },
-    desc: 'Longue allonge. Dégâts ×3 contre la cavalerie et brise les charges (étourdit le cavalier).' },
-  { k: 'shield', name: 'Bouclier', cat: 'army', r: 5, spd: 30, hp: 190, arm: 3, dmg: 8, reach: 2.5, cd: 1.1, vis: 170, beh: B.MELEE, flags: F.SHIELD | F.BRAVE,
-    look: { tunic: 1, armor: '#8d969e', helmet: 'great', weapon: 'sword', shield: 'tower' },
-    desc: 'Pavois géant : bloque 85 % des projectiles venant de face et protège ceux qui sont derrière.' },
-  { k: 'knight', name: 'Chevalier', cat: 'army', r: 5, spd: 32, hp: 280, arm: 6, dmg: 22, reach: 3, cd: 1.1, vis: 180, beh: B.MELEE, flags: F.BRAVE,
-    look: { tunic: 1, armor: '#b8c0c8', helmet: 'great', weapon: 'sword', shield: 'kite', plume: 1 },
-    desc: 'Armure lourde (−6 dégâts par coup). Ne fuit jamais.' },
-  { k: 'barbarian', name: 'Barbare', cat: 'army', r: 5, spd: 46, hp: 160, arm: 0, dmg: 24, reach: 4, cd: 1.3, vis: 190, beh: B.MELEE, flags: F.CLEAVE | F.BRAVE,
-    look: { tunic: 1, skin: '#e0a37a', helmet: 'horn', weapon: 'axe', beard: '#b0662a', bare: 1 },
-    desc: 'Hache à deux mains : frappe tous les ennemis devant lui d\'un coup.' },
-  { k: 'berserk', name: 'Berserker', cat: 'army', r: 4.5, spd: 50, hp: 150, arm: 0, dmg: 15, reach: 2.5, cd: 0.7, vis: 200, beh: B.MELEE, flags: F.BERSERK | F.BRAVE | F.LIFESTEAL,
-    look: { tunic: 1, skin: '#e8a988', helmet: 'wolf', weapon: 'axes', beard: '#c0442a', bare: 1 },
-    desc: 'Plus il est blessé, plus il frappe vite et fort. Se soigne avec 30 % des dégâts infligés.' },
-  { k: 'archer', name: 'Archer', cat: 'army', r: 4, spd: 40, hp: 60, arm: 0, dmg: 10, rng: 230, cd: 1.6, vis: 270, beh: B.RANGED, proj: P.ARROW, flags: F.KITE,
-    look: { tunic: 1, helmet: 'hood', weapon: 'bow', quiver: 1 },
-    desc: 'Tir en cloche avec anticipation du mouvement. Recule si un ennemi s\'approche trop.' },
-  { k: 'xbow', name: 'Arbalétrier', cat: 'army', r: 4.5, spd: 34, hp: 85, arm: 1, dmg: 28, rng: 260, cd: 3.0, vis: 290, beh: B.RANGED, proj: P.BOLT, flags: F.AP,
-    look: { tunic: 1, helmet: 'kettle', weapon: 'xbow' },
-    desc: 'Carreau tendu perforant : ignore l\'armure. Lent à recharger.' },
-  { k: 'javelin', name: 'Javelinier', cat: 'army', r: 4.5, spd: 44, hp: 90, arm: 1, dmg: 22, rng: 130, cd: 2.2, vis: 200, beh: B.RANGED, proj: P.JAVELIN, flags: F.KITE,
-    look: { tunic: 1, helmet: 'cap', weapon: 'javelin', shield: 'small' },
-    desc: 'Lance des javelots à courte portée, puissants contre les unités lourdes.' },
-  { k: 'musket', name: 'Mousquetaire', cat: 'army', r: 4.5, spd: 36, hp: 85, arm: 0, dmg: 36, rng: 290, cd: 3.6, vis: 320, beh: B.RANGED, proj: P.BULLET, flags: 0,
-    look: { tunic: 1, helmet: 'tricorn', weapon: 'musket', pants: '#e8e2d0' },
-    desc: 'Tir instantané dévastateur mais imprécis, nuage de fumée. Rechargement très long.' },
-  { k: 'sniper', name: 'Tireur d\'élite', cat: 'army', r: 4, spd: 32, hp: 60, arm: 0, dmg: 95, rng: 640, cd: 4.5, vis: 660, beh: B.RANGED, proj: P.BULLET, flags: F.KITE | F.PICKY | F.AP,
-    look: { tunic: 0.6, helmet: 'ghillie', weapon: 'rifle' },
-    desc: 'Portée énorme. Vise en priorité les rois, mages, soigneurs et tireurs.' },
-  { k: 'grenadier', name: 'Grenadier', cat: 'army', r: 4.5, spd: 38, hp: 95, arm: 1, dmg: 50, aoe: 34, rng: 170, minr: 30, cd: 3.2, vis: 220, beh: B.RANGED, proj: P.GRENADE, flags: 0,
-    look: { tunic: 1, helmet: 'bearskin', weapon: 'grenade' },
-    desc: 'Lance des grenades à mèche (dégâts de zone, recul). Ne tire pas à bout portant.' },
-  { k: 'flamer', name: 'Lance-flammes', cat: 'army', r: 4.5, spd: 36, hp: 130, arm: 2, dmg: 3.2, rng: 62, cd: 0.05, vis: 200, beh: B.RANGED, proj: P.FLAME, flags: F.EXPLODE | F.FIREPROOF,
-    look: { tunic: 1, armor: '#5d6248', helmet: 'gasmask', weapon: 'flamer' },
-    desc: 'Jet de flammes : met le feu aux troupes et au terrain. Son réservoir explose à sa mort.' },
-  { k: 'mage', name: 'Mage', cat: 'army', r: 4, spd: 36, hp: 75, arm: 0, dmg: 42, aoe: 30, rng: 250, cd: 2.8, vis: 280, beh: B.RANGED, proj: P.FIREBALL, flags: F.KITE | F.FIREPROOF,
-    look: { tunic: 1, robe: 1, helmet: 'wizard', weapon: 'staff', beard: '#ddd' },
-    desc: 'Boules de feu explosives et incendiaires. Garde ses distances.' },
-  { k: 'monk', name: 'Moine soigneur', cat: 'army', r: 4, spd: 40, hp: 75, arm: 0, dmg: 0, heal: 16, rng: 70, cd: 0.25, vis: 220, beh: B.HEAL, flags: F.COWARD,
-    look: { tunic: 1, robe: 1, helmet: 'monk', weapon: 'book' },
-    desc: 'Cherche le blessé allié le plus proche et le soigne. Évite le contact avec l\'ennemi.' },
-  { k: 'drummer', name: 'Tambour', cat: 'army', r: 4, spd: 40, hp: 70, arm: 0, dmg: 5, reach: 2, cd: 1, vis: 200, beh: B.SUPPORT, flags: F.AURA,
-    look: { tunic: 1, helmet: 'shako', weapon: 'drum' },
-    desc: 'Aura (rayon 100) : alliés +20 % vitesse, +30 % dégâts, ne fuient plus. Reste en retrait.' },
-  { k: 'ninja', name: 'Ninja', cat: 'army', r: 4, spd: 72, hp: 75, arm: 0, dmg: 20, reach: 2.5, cd: 0.5, vis: 420, beh: B.NINJA, proj: P.SHURIKEN, rng: 110, flags: F.DODGE | F.PICKY | F.BRAVE,
-    look: { tunic: 0.25, helmet: 'ninja', weapon: 'katana' },
-    desc: 'Se téléporte derrière les tireurs et soigneurs ennemis. Esquive 50 % des projectiles, lance des shurikens.' },
-  { k: 'sapper', name: 'Sapeur', cat: 'army', r: 4.5, spd: 56, hp: 60, arm: 0, dmg: 160, aoe: 55, cd: 1, vis: 700, beh: B.SAPPER, flags: F.EXPLODE | F.PREFBUILD | F.BRAVE,
-    look: { tunic: 1, helmet: 'cap', weapon: 'bomb' },
-    desc: 'Fonce vers les bâtiments ennemis (sinon la foule) et se fait exploser. Dégâts ×3 sur bâtiments et murs.' },
-  { k: 'cavalry', name: 'Cavalier', cat: 'army', r: 6.5, spd: 82, hp: 230, arm: 2, dmg: 26, reach: 3, cd: 1.0, vis: 300, beh: B.CAV, mass: 3, flags: F.MOUNTED,
-    look: { tunic: 1, armor: '#aab2ba', helmet: 'kettle', weapon: 'lance', mount: '#7a4f2c' },
-    desc: 'Charge : accélère, percute (dégâts ×2,5 + recul), traverse les lignes puis fait demi-tour pour recharger.' },
-  { k: 'harcher', name: 'Archer monté', cat: 'army', r: 6.5, spd: 78, hp: 140, arm: 1, dmg: 8, rng: 200, cd: 1.3, vis: 260, beh: B.RANGED, proj: P.ARROW, mass: 3, flags: F.MOUNTED | F.KITE | F.MOVESHOOT,
-    look: { tunic: 1, helmet: 'fur', weapon: 'bow', mount: '#c9a26b' },
-    desc: 'Harcèle : tire en se déplaçant et reste hors de portée de l\'infanterie.' },
-  { k: 'king', name: 'Roi', cat: 'army', r: 6, spd: 30, hp: 1500, arm: 6, dmg: 45, reach: 5, cd: 1.0, vis: 220, beh: B.MELEE, mass: 4, flags: F.CLEAVE | F.BRAVE | F.KING | F.AURA,
-    look: { tunic: 1, armor: '#d9b44a', helmet: 'crown', weapon: 'bigsword', cape: 1, beard: '#6a4a2a', scale: 1.3 },
-    desc: 'Énorme et galvanisant (aura). S\'il meurt, toute son armée panique et fuit quelques secondes.' },
-  // ------------------------------------------------------------- SIÈGE
-  { k: 'catapult', name: 'Catapulte', cat: 'siege', r: 9, spd: 14, hp: 420, arm: 2, dmg: 90, aoe: 46, rng: 760, minr: 120, cd: 6.0, vis: 780, beh: B.RANGED, proj: P.STONE, mass: 10, flags: F.SIEGE | F.PREFBUILD | F.BRAVE,
-    desc: 'Pierres en cloche à très longue portée (zone). Vise les bâtiments en priorité. Inutile de près.' },
-  { k: 'ballista', name: 'Baliste', cat: 'siege', r: 8, spd: 16, hp: 320, arm: 2, dmg: 75, rng: 520, cd: 4.5, vis: 540, beh: B.RANGED, proj: P.BBOLT, mass: 9, flags: F.SIEGE | F.AP | F.BRAVE,
-    desc: 'Énorme carreau qui transperce jusqu\'à 8 ennemis alignés.' },
-  { k: 'cannon', name: 'Canon', cat: 'siege', r: 8, spd: 13, hp: 360, arm: 3, dmg: 100, rng: 600, minr: 40, cd: 5.5, vis: 620, beh: B.RANGED, proj: P.CANNON, mass: 10, flags: F.SIEGE | F.BRAVE,
-    desc: 'Boulet qui ricoche et fauche des rangs entiers, puis explose.' },
-  { k: 'ram', name: 'Bélier', cat: 'siege', r: 9, spd: 22, hp: 700, arm: 9, dmg: 260, reach: 3, cd: 2.2, vis: 3000, beh: B.RAM, mass: 14, flags: F.SIEGE | F.ONLYBUILD | F.BRAVE,
-    desc: 'Ignore les soldats et défonce bâtiments et murs. Très blindé.' },
+  // ------------------------------------------------------------- INFANTERIE
+  { k: 'rifle', name: 'Fusilier', cat: 'inf', r: 4.5, spd: 40, hp: 100, arm: 1, dmg: 12, rng: 220, cd: 0.6, vis: 260, beh: B.RANGED, proj: P.BULLET, flags: F.CANAIR,
+    look: { helmet: 'combat', vest: 1, weapon: 'ar' }, desc: 'Fusil d\'assaut, polyvalent. Peut tirer sur les drones.' },
+  { k: 'mg', name: 'Mitrailleur', cat: 'inf', r: 4.5, spd: 30, hp: 140, arm: 2, dmg: 6, rng: 250, cd: 0.1, vis: 280, beh: B.RANGED, proj: P.BULLET, flags: F.CANAIR,
+    look: { helmet: 'combat', vest: 1, weapon: 'mg' }, desc: 'Rafales continues qui fauchent l\'infanterie. Lent.' },
+  { k: 'sniper', name: 'Sniper', cat: 'inf', r: 4, spd: 32, hp: 70, arm: 0, dmg: 110, rng: 650, cd: 4, vis: 680, beh: B.RANGED, proj: P.BULLET, flags: F.KITE | F.PICKY | F.AP | F.CANAIR,
+    look: { tunic: 0.75, helmet: 'ghillie', weapon: 'rifle' }, desc: 'Portée énorme. Vise d\'abord officiers, médecins, servants d\'armes lourdes.' },
+  { k: 'rpg', name: 'Lance-roquettes', cat: 'inf', r: 4.5, spd: 36, hp: 100, arm: 1, dmg: 80, aoe: 20, rng: 270, cd: 4, vis: 300, beh: B.RANGED, proj: P.ROCKET, flags: F.CANAIR,
+    look: { helmet: 'combat', vest: 1, weapon: 'rpg' }, desc: 'Roquette antichar : dégâts ×2,5 sur véhicules, bâtiments et hélicoptères.' },
+  { k: 'grenadier', name: 'Grenadier', cat: 'inf', r: 4.5, spd: 38, hp: 100, arm: 1, dmg: 45, aoe: 30, rng: 170, minr: 30, cd: 3, vis: 220, beh: B.RANGED, proj: P.GRENADE, flags: 0,
+    look: { helmet: 'combat', vest: 1, weapon: 'grenade' }, desc: 'Grenades à fragmentation (zone + recul).' },
+  { k: 'flamer', name: 'Lance-flammes', cat: 'inf', r: 4.5, spd: 36, hp: 140, arm: 2, dmg: 3.2, rng: 62, cd: 0.05, vis: 200, beh: B.RANGED, proj: P.FLAME, flags: F.EXPLODE | F.FIREPROOF,
+    look: { vest: 1, helmet: 'gasmask', weapon: 'flamer' }, desc: 'Incendie troupes et terrain. Son réservoir explose à sa mort.' },
+  { k: 'medic', name: 'Médecin', cat: 'inf', r: 4.5, spd: 42, hp: 90, arm: 0, dmg: 0, heal: 18, rng: 70, cd: 0.25, vis: 240, beh: B.HEAL, flags: F.COWARD,
+    look: { helmet: 'medic', weapon: 'medkit' }, desc: 'Soigne le blessé allié le plus proche, évite le contact.' },
+  { k: 'officer', name: 'Officier', cat: 'inf', r: 4.5, spd: 40, hp: 110, arm: 1, dmg: 8, reach: 2, cd: 1, vis: 220, beh: B.SUPPORT, flags: F.AURA,
+    look: { helmet: 'beret', weapon: 'pistol' }, desc: 'Aura (rayon 100) : alliés +20 % vitesse, +30 % dégâts, ne paniquent plus.' },
+  { k: 'riot', name: 'Bouclier', cat: 'inf', r: 5, spd: 32, hp: 220, arm: 4, dmg: 9, reach: 2.5, cd: 1, vis: 180, beh: B.MELEE, flags: F.SHIELD | F.BRAVE,
+    look: { helmet: 'riot', vest: 1, weapon: 'baton', shield: 'riot' }, desc: 'Bouclier balistique : bloque 85 % des tirs de face, protège ceux derrière lui.' },
+  { k: 'commando', name: 'Commando', cat: 'inf', r: 4.5, spd: 70, hp: 110, arm: 1, dmg: 22, reach: 2.5, cd: 0.4, vis: 420, beh: B.NINJA, proj: P.BULLET, rng: 150, flags: F.DODGE | F.PICKY | F.BRAVE | F.CANAIR,
+    look: { tunic: 0.35, helmet: 'balaclava', weapon: 'smg' }, desc: 'S\'infiltre derrière les lignes pour éliminer snipers, médecins et officiers. Esquive 50 % des tirs.' },
+  { k: 'sapper', name: 'Sapeur C4', cat: 'inf', r: 4.5, spd: 56, hp: 70, arm: 0, dmg: 180, aoe: 50, cd: 1, vis: 700, beh: B.SAPPER, flags: F.EXPLODE | F.PREFBUILD | F.BRAVE,
+    look: { helmet: 'combat', vest: 1, weapon: 'c4' }, desc: 'Court poser sa charge sur les bâtiments et blindés ennemis. Dégâts ×3 sur structures.' },
+  // ------------------------------------------------------------- VÉHICULES
+  { k: 'jeep', name: 'Jeep mitrailleuse', cat: 'veh', r: 8.5, spd: 95, hp: 320, arm: 5, dmg: 9, rng: 230, cd: 0.13, vis: 280, beh: B.RANGED, proj: P.BULLET, mass: 6, flags: F.VEHICLE | F.MOVESHOOT | F.KITE | F.CANAIR | F.BRAVE,
+    desc: 'Rapide : harcèle en tirant en mouvement et reste hors de portée.' },
+  { k: 'apc', name: 'Blindé de transport', cat: 'veh', r: 10.5, spd: 55, hp: 900, arm: 9, dmg: 20, rng: 280, cd: 0.35, vis: 320, beh: B.RANGED, proj: P.BULLET, mass: 12, flags: F.VEHICLE | F.CANAIR | F.BRAVE, cargo: ['rifle', 4],
+    desc: 'Canon automatique. Quand il est détruit, 4 fusiliers en sortent.' },
+  { k: 'tank', name: 'Char d\'assaut', cat: 'veh', r: 12.5, spd: 28, hp: 1800, arm: 14, dmg: 140, aoe: 26, rng: 400, cd: 4.2, vis: 420, beh: B.RANGED, proj: P.TSHELL, mass: 25, flags: F.VEHICLE | F.SIEGE | F.BRAVE,
+    desc: 'Blindage énorme (−14 par coup) : les balles ricochent. Obus explosif longue portée.' },
+  { k: 'artillery', name: 'Obusier', cat: 'veh', r: 11, spd: 24, hp: 400, arm: 3, dmg: 110, aoe: 46, rng: 950, minr: 160, cd: 5.5, vis: 980, beh: B.RANGED, proj: P.SHELL, mass: 12, flags: F.VEHICLE | F.SIEGE | F.PREFBUILD | F.BRAVE,
+    desc: 'Tir indirect à très longue portée. Inutile au contact.' },
+  { k: 'mlrs', name: 'Lance-roquettes multiple', cat: 'veh', r: 11, spd: 28, hp: 500, arm: 4, dmg: 45, aoe: 24, rng: 850, minr: 160, cd: 10, vis: 880, beh: B.RANGED, proj: P.MRL, mass: 12, flags: F.VEHICLE | F.SIEGE | F.BRAVE,
+    desc: 'Salve de 8 roquettes qui sature une zone entière.' },
+  { k: 'aa', name: 'Véhicule anti-aérien', cat: 'veh', r: 11, spd: 40, hp: 700, arm: 8, dmg: 16, rng: 480, cd: 0.12, vis: 500, beh: B.RANGED, proj: P.BULLET, mass: 12, flags: F.VEHICLE | F.AAONLY | F.BRAVE,
+    desc: 'Double canon antiaérien : ne tire que sur drones, hélicoptères et avions.' },
+  // ------------------------------------------------------------- AÉRIEN
+  { k: 'fpv', name: 'Drone kamikaze', cat: 'air', r: 3, spd: 125, hp: 12, arm: 0, dmg: 160, aoe: 22, cd: 1, vis: 600, beh: B.DRONEK, alt: 16, flags: F.AIR | F.EXPLODE | F.PICKY | F.BRAVE,
+    desc: 'Survole tout et fonce sur les blindés et bâtiments ennemis pour exploser (×2,5 sur véhicules).' },
+  { k: 'bomber', name: 'Drone bombardier', cat: 'air', r: 4.5, spd: 70, hp: 40, arm: 0, dmg: 70, aoe: 26, cd: 3.5, vis: 450, beh: B.DRONEB, proj: P.BOMB, alt: 26, flags: F.AIR | F.BRAVE,
+    desc: 'Survole l\'ennemi, largue une bombe puis s\'écarte pour revenir.' },
+  { k: 'heli', name: 'Hélicoptère', cat: 'air', r: 11, spd: 72, hp: 900, arm: 5, dmg: 60, aoe: 18, rng: 300, cd: 1.4, vis: 340, beh: B.RANGED, proj: P.ROCKET, alt: 34, mass: 10, flags: F.AIR | F.MOVESHOOT | F.CANAIR | F.BRAVE,
+    desc: 'Roquettes sur les blindés et bâtiments, mitrailleuse sur l\'infanterie.' },
+  { k: 'jet', name: 'Avion d\'attaque', cat: 'air', r: 10, spd: 230, hp: 450, arm: 4, dmg: 110, aoe: 40, cd: 2.5, vis: 1400, beh: B.JET, proj: P.BOMB, alt: 46, mass: 10, flags: F.AIR | F.BRAVE,
+    desc: 'Passes de bombardement à grande vitesse, puis demi-tour pour la passe suivante.' },
   // ------------------------------------------------------------- BÂTIMENTS
-  { k: 'hut', name: 'Hutte', cat: 'build', r: 13, hp: 380, arm: 0, vis: 0, beh: B.BUILD, flags: F.BUILD | F.STATIC | F.FLAMMABLE, spawn: 'peasant', every: 6,
-    desc: 'Produit des paysans toutes les 6 s. Toit de paille très inflammable.' },
-  { k: 'barracks', name: 'Caserne', cat: 'build', r: 20, hp: 1000, arm: 2, vis: 0, beh: B.BUILD, flags: F.BUILD | F.STATIC | F.FLAMMABLE, spawn: ['soldier', 'spear', 'soldier', 'shield'], every: 5,
-    desc: 'Produit fantassins, lanciers et boucliers toutes les 5 s.' },
-  { k: 'range', name: 'Camp d\'archers', cat: 'build', r: 17, hp: 650, arm: 0, vis: 0, beh: B.BUILD, flags: F.BUILD | F.STATIC | F.FLAMMABLE, spawn: ['archer', 'archer', 'xbow'], every: 5.5,
-    desc: 'Produit archers et arbalétriers.' },
-  { k: 'stable', name: 'Écurie', cat: 'build', r: 20, hp: 850, arm: 1, vis: 0, beh: B.BUILD, flags: F.BUILD | F.STATIC | F.FLAMMABLE, spawn: ['cavalry', 'harcher'], every: 9,
-    desc: 'Produit cavaliers et archers montés toutes les 9 s.' },
-  { k: 'workshop', name: 'Atelier de siège', cat: 'build', r: 20, hp: 900, arm: 1, vis: 0, beh: B.BUILD, flags: F.BUILD | F.STATIC | F.FLAMMABLE, spawn: ['catapult', 'ram', 'ballista', 'cannon'], every: 16,
-    desc: 'Construit catapultes, béliers, balistes et canons.' },
-  { k: 'tower', name: 'Tour d\'archers', cat: 'build', r: 10, hp: 1100, arm: 5, dmg: 12, rng: 330, cd: 0.7, vis: 340, beh: B.BUILD, proj: P.ARROW, flags: F.BUILD | F.STATIC,
-    desc: 'Tour de pierre qui arrose les ennemis de flèches (portée 330).' },
-  { k: 'magetower', name: 'Tour de mage', cat: 'build', r: 10, hp: 850, arm: 3, dmg: 50, aoe: 34, rng: 320, cd: 2.6, vis: 330, beh: B.BUILD, proj: P.FIREBALL, flags: F.BUILD | F.STATIC,
-    desc: 'Lance des boules de feu sur les groupes ennemis.' },
-  { k: 'bastion', name: 'Bastion à canon', cat: 'build', r: 13, hp: 1400, arm: 6, dmg: 110, rng: 560, cd: 5, vis: 570, beh: B.BUILD, proj: P.CANNON, flags: F.BUILD | F.STATIC,
-    desc: 'Fortin équipé d\'un canon longue portée.' },
-  { k: 'temple', name: 'Temple', cat: 'build', r: 17, hp: 800, arm: 2, vis: 0, beh: B.BUILD, flags: F.BUILD | F.STATIC | F.HEALAURA, spawn: 'monk', every: 14,
-    desc: 'Soigne en permanence les alliés proches (rayon 120) et forme des moines.' },
-  { k: 'castle', name: 'Château', cat: 'build', r: 40, hp: 14000, arm: 8, dmg: 14, rng: 380, cd: 0.35, vis: 390, beh: B.BUILD, proj: P.ARROW, flags: F.BUILD | F.STATIC, spawn: ['knight', 'soldier', 'archer', 'knight', 'spear'], every: 4,
-    desc: 'Forteresse : tirs de flèches en rafale, produit chevaliers et soldats. Immense résistance.' },
-  { k: 'tent', name: 'Tente de commandement', cat: 'build', r: 12, hp: 400, arm: 0, vis: 0, beh: B.BUILD, flags: F.BUILD | F.STATIC | F.FLAMMABLE | F.AURA, spawn: ['drummer', 'ninja', 'sapper'], every: 10,
-    desc: 'Aura galvanisante. Forme tambours, ninjas et sapeurs.' },
-  { k: 'barrel', name: 'Baril de poudre', cat: 'build', r: 4, hp: 25, arm: 0, vis: 0, beh: B.PROP, flags: F.BUILD | F.STATIC | F.EXPLODE | F.NEUTRAL, dmg: 140, aoe: 60,
-    desc: 'Neutre. Explose au moindre choc ou au contact du feu : réactions en chaîne garanties.' },
+  { k: 'bunker', name: 'Bunker', cat: 'build', r: 13, hp: 3000, arm: 12, dmg: 9, rng: 280, cd: 0.13, vis: 290, beh: B.BUILD, proj: P.BULLET, flags: F.BUILD | F.STATIC | F.CANAIR,
+    desc: 'Casemate en béton armée d\'une mitrailleuse.' },
+  { k: 'turret', name: 'Tourelle automatique', cat: 'build', r: 7, hp: 800, arm: 8, dmg: 11, rng: 320, cd: 0.12, vis: 330, beh: B.BUILD, proj: P.BULLET, flags: F.BUILD | F.STATIC | F.CANAIR,
+    desc: 'Tire automatiquement sur tout ce qui approche, au sol comme en l\'air.' },
+  { k: 'sam', name: 'Batterie de missiles', cat: 'build', r: 11, hp: 900, arm: 6, dmg: 220, rng: 700, cd: 3, vis: 710, beh: B.BUILD, proj: P.MISSILE, flags: F.BUILD | F.STATIC | F.AAONLY,
+    desc: 'Missiles sol-air à tête chercheuse : abat drones, hélicoptères et avions.' },
+  { k: 'barracks', name: 'Caserne', cat: 'build', r: 20, hp: 1100, arm: 4, vis: 0, beh: B.BUILD, flags: F.BUILD | F.STATIC, spawn: ['rifle', 'rifle', 'mg', 'rpg', 'rifle', 'medic', 'grenadier'], every: 3.5,
+    desc: 'Forme fusiliers, mitrailleurs, lance-roquettes, médecins et grenadiers.' },
+  { k: 'factory', name: 'Usine de blindés', cat: 'build', r: 24, hp: 1800, arm: 8, vis: 0, beh: B.BUILD, flags: F.BUILD | F.STATIC, spawn: ['jeep', 'apc', 'tank', 'aa', 'artillery', 'mlrs'], every: 12,
+    desc: 'Produit jeeps, blindés, chars, anti-aériens et artillerie.' },
+  { k: 'helipad', name: 'Héliport', cat: 'build', r: 18, hp: 900, arm: 4, vis: 0, beh: B.BUILD, flags: F.BUILD | F.STATIC, spawn: ['heli', 'jet', 'bomber'], every: 12,
+    desc: 'Fait décoller hélicoptères, avions et drones bombardiers.' },
+  { k: 'dronebase', name: 'Base de drones', cat: 'build', r: 14, hp: 700, arm: 3, vis: 0, beh: B.BUILD, flags: F.BUILD | F.STATIC, spawn: ['fpv', 'fpv', 'fpv', 'bomber'], every: 3,
+    desc: 'Lance un essaim continu de drones kamikazes et bombardiers.' },
+  { k: 'hospital', name: 'Hôpital de campagne', cat: 'build', r: 17, hp: 800, arm: 2, vis: 0, beh: B.BUILD, flags: F.BUILD | F.STATIC | F.HEALAURA, spawn: 'medic', every: 12,
+    desc: 'Soigne en continu les alliés proches (rayon 120) et forme des médecins.' },
+  { k: 'hq', name: 'Quartier général', cat: 'build', r: 34, hp: 9000, arm: 10, dmg: 10, rng: 340, cd: 0.25, vis: 350, beh: B.BUILD, proj: P.BULLET, flags: F.BUILD | F.STATIC | F.AURA | F.CANAIR, spawn: ['commando', 'officer', 'sniper', 'sapper'], every: 8,
+    desc: 'Centre de commandement : aura galvanisante, défenses, forme les unités d\'élite.' },
+  { k: 'mine', name: 'Mine', cat: 'build', r: 3, hp: 30, arm: 0, dmg: 200, aoe: 26, vis: 0, beh: B.PROP, flags: F.BUILD | F.STATIC | F.EXPLODE | F.MINE,
+    desc: 'Explose quand un ennemi au sol passe dessus. Invisible pour l\'ennemi.' },
+  { k: 'fuel', name: 'Dépôt de carburant', cat: 'build', r: 8, hp: 60, arm: 0, dmg: 220, aoe: 90, vis: 0, beh: B.PROP, flags: F.BUILD | F.STATIC | F.EXPLODE | F.NEUTRAL,
+    desc: 'Neutre. Explose en boule de feu au moindre impact.' },
 ];
 G.UNITS = UNITS;
 G.U = {};
@@ -190,7 +159,7 @@ G.UARM = new Float32Array(N); G.UDMG = new Float32Array(N); G.UREACH = new Float
 G.URNG = new Float32Array(N); G.UMINR = new Float32Array(N); G.UCD = new Float32Array(N);
 G.UVIS = new Float32Array(N); G.UBEH = new Uint8Array(N); G.UPROJ = new Uint8Array(N);
 G.UAOE = new Float32Array(N); G.UFL = new Int32Array(N); G.UMASS = new Float32Array(N);
-G.UHEAL = new Float32Array(N); G.UVALUE = new Float32Array(N);
+G.UHEAL = new Float32Array(N); G.UVALUE = new Float32Array(N); G.UALT = new Float32Array(N);
 UNITS.forEach((u, i) => {
   G.UR[i] = u.r; G.USPD[i] = u.spd; G.UHP[i] = u.hp; G.UARM[i] = u.arm; G.UDMG[i] = u.dmg;
   G.UREACH[i] = u.reach; G.URNG[i] = u.rng; G.UMINR[i] = u.minr; G.UCD[i] = u.cd; G.UVIS[i] = u.vis;
@@ -198,9 +167,13 @@ UNITS.forEach((u, i) => {
   G.UHEAL[i] = u.heal;
   // "value" used by picky units (snipers / ninjas)
   let v = 1;
-  if (u.flags & F.KING) v = 6;
-  else if (u.beh === B.HEAL || u.k === 'mage' || u.k === 'drummer') v = 4;
-  else if (u.beh === B.RANGED) v = 3;
-  else if (u.flags & F.SIEGE) v = 2.5;
+  if (u.k === 'tank') v = 7;
+  else if (u.flags & F.VEHICLE) v = 5;
+  else if (u.flags & F.BUILD) v = 2;
+  else if (u.beh === B.HEAL || u.k === 'officer') v = 4;
+  else if (u.k === 'rpg' || u.k === 'sniper' || u.k === 'mg') v = 3.5;
+  else if (u.flags & F.AIR) v = 2;
+  else if (u.beh === B.RANGED) v = 2.5;
   G.UVALUE[i] = v;
+  G.UALT[i] = u.alt || 0;
 });

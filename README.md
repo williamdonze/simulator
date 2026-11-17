@@ -15,28 +15,25 @@ Ouvre simplement `index.html` dans un navigateur récent (WebGL2 requis). Aucune
 - **Rejouer** relance la même bataille ; la poubelle efface tout.
 - Raccourcis clavier : `Entrée` lance ou rejoue, `Espace` met en pause, `C` efface tout, `[` `]` changent la taille du pinceau.
 
-## Contenu
+## Contenu (guerre moderne)
 
-**26 unités** (style cartoon dessiné par code) — paysan, fantassin, lancier, bouclier, chevalier, barbare, berserker, roi, archer, arbalétrier, javelinier, mousquetaire, tireur d'élite, grenadier, lance-flammes, mage, moine soigneur, tambour, ninja, sapeur, cavalier, archer monté, catapulte, baliste, canon, bélier.
+- **Infanterie (11)** : fusilier, mitrailleur, sniper, lance-roquettes, grenadier, lance-flammes, médecin, officier, bouclier balistique, commando, sapeur C4.
+- **Véhicules (6)** : jeep mitrailleuse, blindé de transport, char d'assaut, obusier, lance-roquettes multiple, véhicule anti-aérien.
+- **Aérien (4)** : drone kamikaze, drone bombardier, hélicoptère, avion d'attaque.
+- **Bâtiments (11)** : caserne, usine de blindés, héliport, base de drones, hôpital de campagne, quartier général, bunker, tourelle automatique, batterie de missiles sol-air, mine, dépôt de carburant.
+- **Terrain** : forêt, herbes hautes, eau, eau profonde, boue, sable, route, rochers, mur de béton, sacs de sable, barbelés, plus le feu et la gomme.
 
-**12 bâtiments** — hutte, caserne, camp d'archers, écurie, atelier de siège, tente de commandement, temple, tour d'archers, tour de mage, bastion à canon, château, baril de poudre.
+Comportements notables :
 
-**11 terrains** — forêt, herbes hautes, eau peu profonde, eau profonde, boue, sable, route, rochers, mur de pierre, palissade, pieux. Plus des outils : gomme, torche, prairie.
-
-Chaque élément a son propre comportement (survole un outil pour le lire) :
-
-- **Lanciers** : dégâts ×3 contre la cavalerie, ils brisent les charges.
-- **Cavaliers** : ils accélèrent, percutent, traversent les lignes puis font demi-tour pour recharger.
-- **Boucliers** : ils bloquent 85 % des projectiles venant de face.
-- **Archers** et **mages** : ils reculent quand l'ennemi s'approche ; les archers montés tirent en se déplaçant.
-- **Tireurs d'élite** et **ninjas** : ils visent les rois, soigneurs et tireurs ; les ninjas se téléportent dans leur dos.
-- **Sapeurs** : ils foncent sur les bâtiments et se font exploser.
-- **Béliers** : ils ignorent les soldats et défoncent bâtiments et murs.
-- **Paysans** : ils fuient en infériorité et réparent les bâtiments alliés.
-- **Tambours**, **tente de commandement** et **roi** : aura de vitesse, de dégâts et de courage. Si le roi tombe, son armée panique.
-- **Feu** : il se propage dans l'herbe, la forêt et les palissades. Les unités en flammes paniquent ; l'eau les éteint ; le vent accélère l'incendie.
-- **Murs** : les troupes les contournent s'il existe un chemin, sinon elles les démolissent. Les explosions les détruisent.
-- **Barils de poudre** : ils explosent au moindre choc, d'où des réactions en chaîne.
+- **Unités aériennes** : elles survolent murs, rivières et troupes. Seules les armes à feu, les roquettes et la DCA peuvent les toucher, et les armes légères ratent souvent les cibles volantes.
+- **Drones kamikazes** : ils visent en priorité les blindés et les bâtiments. Les **drones bombardiers** larguent puis s'écartent pour revenir. Les **avions** font des passes de bombardement et reviennent.
+- **Véhicule anti-aérien** et **batterie de missiles** (missiles à tête chercheuse) : ils ne tirent que sur ce qui vole.
+- **Char** : blindage énorme, les balles ricochent. **Lance-roquettes** : dégâts ×2,5 sur blindés, bâtiments et hélicoptères.
+- **Blindé de transport** : 4 fusiliers en sortent quand il est détruit.
+- **Mines** : invisibles pour l'ennemi, elles explosent à son passage.
+- **Commando** : il s'infiltre derrière les lignes et vise snipers, médecins et officiers.
+- **Médecins** et **hôpital** soignent ; l'**officier** et le **QG** galvanisent les troupes proches.
+- **Feu**, **morale** (les unités submergées et blessées paniquent), **murs** contournés ou démolis.
 
 ## Architecture (performances)
 

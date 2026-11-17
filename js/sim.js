@@ -11,7 +11,7 @@
   const { MAXU, MAXP, NT, NEUTRAL, GC, TC } = G;
   const UR = G.UR, USPD = G.USPD, UHP = G.UHP, UARM = G.UARM, UDMG = G.UDMG, UREACH = G.UREACH,
     URNG = G.URNG, UMINR = G.UMINR, UCD = G.UCD, UVIS = G.UVIS, UBEH = G.UBEH, UPROJ = G.UPROJ,
-    UAOE = G.UAOE, UFL = G.UFL, UMASS = G.UMASS, UHEAL = G.UHEAL, UVALUE = G.UVALUE;
+    UAOE = G.UAOE, UFL = G.UFL, UMASS = G.UMASS, UHEAL = G.UHEAL, UVALUE = G.UVALUE, UALT = G.UALT;
   const NTT = G.TERRAIN.length;
   const TSPD = new Float32Array(NTT), TBLK = new Uint8Array(NTT), TFUEL = new Float32Array(NTT), TSPREAD = new Float32Array(NTT), THP = new Float32Array(NTT), TWATER = new Uint8Array(NTT);
   G.TERRAIN.forEach((t, i) => { TSPD[i] = t.spd; TBLK[i] = t.block; TFUEL[i] = t.fuel; TSPREAD[i] = t.spread; THP[i] = t.hp || 0; TWATER[i] = t.water || 0; });
@@ -54,7 +54,8 @@
   const qT = new Float32Array(MAXP), qt = new Float32Array(MAXP), qh = new Float32Array(MAXP);
   const qdmg = new Float32Array(MAXP), qaoe = new Float32Array(MAXP);
   const qkind = new Uint8Array(MAXP), qteam = new Uint8Array(MAXP), qalive = new Uint8Array(MAXP), qpierce = new Uint8Array(MAXP), qap = new Uint8Array(MAXP);
-  const qlast = new Int32Array(MAXP), qlastC = new Int32Array(MAXP);
+  const qlast = new Int32Array(MAXP), qlastC = new Int32Array(MAXP), qtg = new Int32Array(MAXP);
+  const qz0 = new Float32Array(MAXP);
   const qfree = new Int32Array(MAXP);
   let qfreeTop = 0, qhw = 0;
   S.proj = { x: qx, y: qy, z: qz, px: qpx, py: qpy, pz: qpz, vx: qvx, vy: qvy, kind: qkind, alive: qalive, team: qteam, T: qT, t: qt, h: qh, sx: qsx, sy: qsy, tx: qtx, ty: qty };
@@ -83,7 +84,7 @@
     cellStart = new Int32Array(NC + 1);
     tcount = S.tcount = new Uint16Array(NC * NT);
     ttot = new Uint16Array(NC);
-    ctTick = new Int32Array(NC * 4).fill(-99); ctRes = new Int32Array(NC * 4); ctVis = new Float32Array(NC * 4);
+    ctTick = new Int32Array(NC * 8).fill(-99); ctRes = new Int32Array(NC * 8); ctVis = new Float32Array(NC * 8);
     bgrid = new Int32Array(NC).fill(-1);
     fblock = new Uint8Array(NC);
     aura = new Uint8Array(NC * 4); healm = new Uint8Array(NC * 4);
@@ -114,6 +115,7 @@
     S.typeCount = new Int32Array(G.UNITS.length * 4);
     S.terrDirty = true; S.flowDirty = true; S.bdirty = true;
     S.explQ = [];
+    S.spawnQ = [];
     S.events = [];
     S.nproj = 0;
     tgt.fill(-1); tgt2.fill(-1); wallC.fill(-1);
@@ -186,9 +188,14 @@
       let R = UAOE[t] || 26, D = UDMG[t] || 40, fire = 0, et = team[j];
       if (G.UNITS[t].k === 'flamer') { R = 30; D = 45; fire = 1; }
       if (fl & F.NEUTRAL) { fire = 1; et = 255; }
-      if (G.UNITS[t].k === 'sapper') { et = team[j]; fire = 4; }
+      const kk = G.UNITS[t].k;
+      if (kk === 'sapper') { et = team[j]; fire = 4 | 8; }
+      else if (kk === 'fpv' || kk === 'mine') { fire = 8 | 4; }
       S.explQ.push(x[j], y[j], R, D, et, fire | 2, t);
     }
+    const cg = G.UNITS[t].cargo;
+    if (cg && S.phase === 'battle') for (let k = 0; k < cg[1]; k++) S.spawnQ.push(G.U[cg[0]], team[j], x[j] + (rnd() - 0.5) * 12, y[j] + (rnd() - 0.5) * 12);
+    if (fl & F.AIR && !(fl & F.EXPLODE)) G.fx.explosion(x[j], y[j], 10 + UR[t], 1);
     if (fl & F.KING) {
       const tm = team[j];
       for (let k = 0; k < hw; k++) if (alive[k] && team[k] === tm && !(UFL[type[k]] & F.BUILD)) flee[k] = 2.5 + rnd() * 3;
@@ -239,6 +246,7 @@
       const c = cy * GW + cx;
       cellOf[i] = c;
       cellStart[c + 1]++;
+      if (UFL[type[i]] & F.MINE) continue;
       tcount[c * NT + team[i]]++;
       if (team[i] < 4) ttot[c]++;
       tc[team[i]]++;
@@ -258,6 +266,7 @@
     blist.length = w;
     bgrid.fill(-1);
     for (const b of blist) {
+      if (UFL[type[b]] & F.MINE) continue;
       const r = UR[type[b]] + 4;
       const x0 = Math.max(0, ((x[b] - r) / GC) | 0), x1 = Math.min(GW - 1, ((x[b] + r) / GC) | 0);
       const y0 = Math.max(0, ((y[b] - r) / GC) | 0), y1 = Math.min(GH - 1, ((y[b] + r) / GC) | 0);
@@ -381,6 +390,7 @@
     let cx = (xi / GC) | 0, cy = (yi / GC) | 0;
     const R = Math.min(Math.ceil(vis / GC), 64);
     const picky = (fl & F.PICKY) && mode === 0;
+    const canAir = (fl & (F.CANAIR | F.AAONLY)) ? 1 : 0, aaOnly = fl & F.AAONLY;
     let best = -1, bestS = 1e9, found = -1;
     const extra = picky ? 6 : 1;
     let r0 = 0;
@@ -394,7 +404,10 @@
     // per-cell/per-team cache for plain nearest-enemy searches
     let ck = -1;
     if (mode === 0 && !picky && tm < 4) {
-      ck = (cy * GW + cx) * 4 + tm;
+      ck = ((cy * GW + cx) * 4 + tm) * 2 + canAir;
+      if (aaOnly) ck = -1;
+    }
+    if (ck >= 0) {
       if (S.tick - ctTick[ck] < 3 && ctVis[ck] >= vis) {
         const j = ctRes[ck];
         if (j < 0) return -1;
@@ -421,6 +434,8 @@
             const j = cellItems[k];
             if (!alive[j]) continue;
             const tj = type[j], tf = UFL[tj];
+            if (tf & F.MINE) continue;
+            if (tf & F.AIR) { if (!canAir) continue; } else if (aaOnly) continue;
             if (mode === 1) {
               if (team[j] !== tm || j === i || (tf & F.BUILD) || hp[j] >= UHP[tj] * 0.97) continue;
             } else {
@@ -449,7 +464,7 @@
     let best = -1, bd = maxd;
     for (let k = 0; k < blist.length; k++) {
       const b = blist[k];
-      if (!alive[b] || team[b] === tm || team[b] === NEUTRAL) continue;
+      if (!alive[b] || team[b] === tm || team[b] === NEUTRAL || (UFL[type[b]] & F.MINE)) continue;
       const d = Math.hypot(x[b] - x[i], y[b] - y[i]) - UR[type[b]];
       if (d < bd) { bd = d; best = b; }
     }
@@ -468,7 +483,7 @@
   }
 
   // unit hit test at a point: nearest unit not of `tm` (neutral props included)
-  function hitAt(hx, hy, rad, tm, skip) {
+  function hitAt(hx, hy, rad, tm, skip, am = 0) {
     let cx = (hx / GC) | 0, cy = (hy / GC) | 0;
     let best = -1, bd = 1e9;
     for (let yy = cy - 1; yy <= cy + 1; yy++) {
@@ -480,15 +495,17 @@
         for (let k = cellStart[c]; k < s1; k++) {
           const j = cellItems[k];
           if (!alive[j] || team[j] === tm || j === skip) continue;
-          const tj = type[j];
-          if (UFL[tj] & F.BUILD && !(UFL[tj] & F.NEUTRAL)) continue; // buildings via bgrid
+          const tj = type[j], tfl = UFL[tj];
+          if (tfl & F.MINE) continue;
+          if (tfl & F.AIR) { if (am === 0) continue; } else if (am === 2) continue;
+          if (tfl & F.BUILD && !(tfl & F.NEUTRAL)) continue; // buildings via bgrid
           const dx = x[j] - hx, dy = y[j] - hy;
           const d2 = dx * dx + dy * dy, rr = UR[tj] + rad;
           if (d2 < rr * rr && d2 < bd) { bd = d2; best = j; }
         }
       }
     }
-    if (best < 0) {
+    if (best < 0 && am !== 2) {
       if (cx >= 0 && cy >= 0 && cx < GW && cy < GH) {
         const b = bgrid[cy * GW + cx];
         if (b >= 0 && alive[b] && team[b] !== tm && b !== skip) {
@@ -522,12 +539,14 @@
       for (let k = cellStart[c]; k < s1; k++) {
         const j = cellItems[k];
         if (!alive[j] || (team[j] === tm && !S.friendlyFire)) continue;
-        const tj = type[j];
-        if ((UFL[tj] & F.BUILD) && !(UFL[tj] & F.NEUTRAL)) continue;
+        const tj = type[j], tfj = UFL[tj];
+        if ((tfj & F.BUILD) && !(tfj & F.NEUTRAL)) continue;
+        if (tfj & F.AIR) continue;
         const dx = x[j] - ex, dy = y[j] - ey;
         const d = Math.sqrt(dx * dx + dy * dy);
         if (d > R + UR[tj]) continue;
-        const f = 1 - 0.6 * Math.min(1, d / R);
+        let f = 1 - 0.6 * Math.min(1, d / R);
+        if ((flags & 8) && (tfj & F.VEHICLE)) f *= 2.5;
         const m = UMASS[tj];
         if (d > 0.01 && m < 50) { const kb = (160 * f) / Math.sqrt(m); kx[j] += (dx / d) * kb; ky[j] += (dy / d) * kb; stun[j] = Math.max(stun[j], 0.25 * f); }
         if (fire && !(UFL[tj] & F.FIREPROOF)) burn[j] = Math.max(burn[j], 3 + rnd() * 2);
@@ -640,36 +659,44 @@
   }
   function freeProj(p) { qalive[p] = 0; qfree[qfreeTop++] = p; S.nproj--; }
 
-  const ARC_SPD = []; ARC_SPD[P.ARROW] = 230; ARC_SPD[P.GRENADE] = 140; ARC_SPD[P.STONE] = 210; ARC_SPD[P.JAVELIN] = 200;
-  const ARC_H = []; ARC_H[P.ARROW] = 0.22; ARC_H[P.GRENADE] = 0.35; ARC_H[P.STONE] = 0.32; ARC_H[P.JAVELIN] = 0.16;
-  const LIN_SPD = []; LIN_SPD[P.BOLT] = 520; LIN_SPD[P.FIREBALL] = 250; LIN_SPD[P.FLAME] = 190; LIN_SPD[P.BBOLT] = 620; LIN_SPD[P.CANNON] = 430; LIN_SPD[P.SHURIKEN] = 320;
+  const ARC_SPD = []; ARC_SPD[P.ARROW] = 230; ARC_SPD[P.GRENADE] = 140; ARC_SPD[P.STONE] = 210; ARC_SPD[P.JAVELIN] = 200; ARC_SPD[P.SHELL] = 280; ARC_SPD[P.MRL] = 250; ARC_SPD[P.BOMB] = 400;
+  const ARC_H = []; ARC_H[P.ARROW] = 0.22; ARC_H[P.GRENADE] = 0.35; ARC_H[P.STONE] = 0.32; ARC_H[P.JAVELIN] = 0.16; ARC_H[P.SHELL] = 0.36; ARC_H[P.MRL] = 0.3; ARC_H[P.BOMB] = 0;
+  const IS_ARC = new Uint8Array(32); [P.ARROW, P.GRENADE, P.STONE, P.JAVELIN, P.SHELL, P.MRL, P.BOMB].forEach((k) => (IS_ARC[k] = 1));
+  const LIN_SPD = []; LIN_SPD[P.BOLT] = 520; LIN_SPD[P.FIREBALL] = 250; LIN_SPD[P.FLAME] = 190; LIN_SPD[P.BBOLT] = 620; LIN_SPD[P.CANNON] = 430; LIN_SPD[P.SHURIKEN] = 320; LIN_SPD[P.ROCKET] = 320; LIN_SPD[P.MISSILE] = 360; LIN_SPD[P.TSHELL] = 650;
 
-  function fireArc(kind, sx, sy, tx, ty, tm, dmg, aoe, ap) {
-    const p = newProj(); if (p < 0) return;
+  function fireArc(kind, sx, sy, tx, ty, tm, dmg, aoe, ap, z0 = 6) {
+    const p = newProj(); if (p < 0) return -1;
+    qz0[p] = z0;
     const d = Math.hypot(tx - sx, ty - sy);
     qkind[p] = kind; qteam[p] = tm; qalive[p] = 1; qdmg[p] = dmg; qaoe[p] = aoe; qap[p] = ap; qsrc[p] = curAtk;
     qsx[p] = sx; qsy[p] = sy; qtx[p] = tx; qty[p] = ty;
     qT[p] = d / ARC_SPD[kind] + 0.12; qt[p] = 0; qh[p] = Math.min(140, d * ARC_H[kind] + 4);
-    qx[p] = qpx[p] = sx; qy[p] = qpy[p] = sy; qz[p] = qpz[p] = 8;
+    if (kind === P.BOMB) { qT[p] = Math.max(qT[p], 0.25 + z0 * 0.012); qh[p] = 2; }
+    qx[p] = qpx[p] = sx; qy[p] = qpy[p] = sy; qz[p] = qpz[p] = z0;
     qlast[p] = -1; qlastC[p] = -1; qpierce[p] = 0;
     S.nproj++;
+    return p;
   }
-  function fireLin(kind, sx, sy, dirx, diry, tm, dmg, aoe, ap, range, pierce) {
-    const p = newProj(); if (p < 0) return;
+  function fireLin(kind, sx, sy, dirx, diry, tm, dmg, aoe, ap, range, pierce, z0) {
+    const p = newProj(); if (p < 0) return -1;
+    qtg[p] = -1;
     const sp = LIN_SPD[kind];
     qkind[p] = kind; qteam[p] = tm; qalive[p] = 1; qdmg[p] = dmg; qaoe[p] = aoe; qap[p] = ap; qsrc[p] = curAtk;
-    qx[p] = qpx[p] = sx; qy[p] = qpy[p] = sy; qz[p] = qpz[p] = kind === P.CANNON ? 4 : 6;
+    qx[p] = qpx[p] = sx; qy[p] = qpy[p] = sy; qz[p] = qpz[p] = z0 != null ? z0 : kind === P.CANNON ? 4 : 6;
     qvx[p] = dirx * sp; qvy[p] = diry * sp;
     qT[p] = range / sp; qt[p] = 0; qh[p] = 0;
     qsx[p] = sx; qsy[p] = sy;
     qlast[p] = -1; qlastC[p] = -1; qpierce[p] = pierce;
     S.nproj++;
+    return p;
   }
   S.fireArc = fireArc; S.fireLin = fireLin;
 
   function hitscan(i, j, dmg, spread, ap) {
     curAtk = type[i];
-    const sx = x[i] + face[i] * 4, sy = y[i] - 6;
+    const am = UFL[type[j]] & F.AIR ? 2 : 0;
+    const za = UALT[type[i]], zb = UALT[type[j]];
+    const sx = x[i] + face[i] * 4, sy = y[i] - 6 - za;
     let ang = Math.atan2(y[j] - y[i], x[j] - x[i]) + (rnd() - 0.5) * 2 * spread;
     const dx = Math.cos(ang), dy = Math.sin(ang);
     const range = URNG[type[i]] * 1.15;
@@ -686,15 +713,20 @@
         if (tt === T.FOREST && s > 12 && rnd() < 0.3) break;
       }
       if (s < 6) continue;
-      const k = hitAt(hx, hy, 1, tm, i);
+      const k = hitAt(hx, hy, am ? 3 : 1, tm, i, am);
       if (k >= 0) {
+        // small arms are bad at hitting aircraft; dedicated AA is not
+        const fs = UFL[type[i]];
+        const pAir = fs & F.AAONLY ? 1 : fs & (F.VEHICLE | F.BUILD) ? 0.45 : 0.2;
+        if (am && rnd() > pAir) break;
         if (!deflect(k, dx)) { hit = k; damage(k, dmg, tm, ap); }
         break;
       }
     }
-    G.fx.tracer(sx, sy, hx, hy - 4);
-    G.fx.muzzle(sx + dx * 3, sy + dy * 3, face[i]);
-    if (hit >= 0) G.fx.blood(hx, hy, 2);
+    G.fx.tracer(sx, sy, hx, hy - 4 - zb);
+    if (UCD[type[i]] > 0.3 || rnd() < 0.25) G.fx.muzzle(sx + dx * 3, sy + dy * 3, face[i], UCD[type[i]] > 0.3 ? 1 : 0.5);
+    if (hit >= 0 && !(UFL[type[hit]] & (F.VEHICLE | F.BUILD | F.AIR))) G.fx.blood(hx, hy, 1);
+    else if (hit >= 0) G.fx.spark(hx, hy - zb - 3, 1);
   }
 
   function updateProjectiles(dt) {
@@ -703,16 +735,26 @@
       const kind = qkind[p];
       qpx[p] = qx[p]; qpy[p] = qy[p]; qpz[p] = qz[p];
       qt[p] += dt;
-      if (kind === P.ARROW || kind === P.GRENADE || kind === P.STONE || kind === P.JAVELIN) {
+      if (IS_ARC[kind]) {
         const f = Math.min(1, qt[p] / qT[p]);
         qx[p] = qsx[p] + (qtx[p] - qsx[p]) * f;
         qy[p] = qsy[p] + (qty[p] - qsy[p]) * f;
-        qz[p] = qh[p] * 4 * f * (1 - f) + 6 * (1 - f);
+        qz[p] = qh[p] * 4 * f * (1 - f) + qz0[p] * (1 - (kind === P.BOMB ? f * f : f));
         if (f >= 1) { landArc(p); }
         continue;
       }
       // straight
       curAtk = qsrc[p];
+      if (kind === P.MISSILE) {
+        const j = qtg[p];
+        if (j >= 0 && alive[j]) {
+          const dx = x[j] - qx[p], dy = y[j] - qy[p], l = Math.hypot(dx, dy) || 1;
+          const v = LIN_SPD[kind] * (1 + qt[p]);
+          qvx[p] += ((dx / l) * v - qvx[p]) * 0.25; qvy[p] += ((dy / l) * v - qvy[p]) * 0.25;
+          qz[p] += (UALT[type[j]] - qz[p]) * 0.1;
+          if (l < UR[type[j]] + 4) { curAtk = qsrc[p]; damage(j, qdmg[p], qteam[p], true); G.fx.explosion(qx[p], qy[p] - qz[p], 14, 1); freeProj(p); continue; }
+        }
+      }
       const sp = Math.hypot(qvx[p], qvy[p]);
       const steps = Math.max(1, Math.ceil((sp * dt) / 5));
       const sdt = dt / steps;
@@ -723,7 +765,7 @@
         const hx = qx[p], hy = qy[p];
         if (hx < 0 || hy < 0 || hx >= W || hy >= H) { done = true; endLin(p, false); break; }
         const c = ((hy / TC) | 0) * TW + ((hx / TC) | 0);
-        if (c !== qlastC[p]) {
+        if (c !== qlastC[p] && kind !== P.MISSILE && qz[p] < 12) {
           qlastC[p] = c;
           const tt = terr[c];
           if (TBLK[tt] === 1) {
@@ -734,8 +776,9 @@
           if (kind === P.FLAME) { if (TFUEL[tt] > 0 && rnd() < 0.05) ignite(c); if (TWATER[tt]) { done = true; freeProj(p); break; } }
           else if (tt === T.FOREST && kind !== P.CANNON && rnd() < 0.35) { done = true; endLin(p, true); break; }
         }
-        const rad = kind === P.FLAME ? 3 : kind === P.FIREBALL ? 3 : kind === P.CANNON ? 2.5 : 1.5;
-        const j = hitAt(hx, hy, rad, tm, qlast[p]);
+        if (kind === P.MISSILE) continue;
+        const rad = kind === P.FLAME ? 3 : kind === P.FIREBALL ? 3 : kind === P.CANNON ? 2.5 : kind === P.ROCKET || kind === P.TSHELL ? 2.5 : 1.5;
+        const j = hitAt(hx, hy, rad, tm, qlast[p], kind === P.ROCKET ? 1 : 0);
         if (j >= 0) {
           qlast[p] = j;
           const dirx = qvx[p];
@@ -747,6 +790,15 @@
             break;
           }
           if (kind === P.FIREBALL) { done = true; endLin(p, true); break; }
+          if (kind === P.ROCKET || kind === P.TSHELL) {
+            const tf2 = UFL[type[j]];
+            if (!(tf2 & (F.BUILD | F.VEHICLE | F.AIR)) && deflect(j, dirx)) { done = true; freeProj(p); break; }
+            const heavy = tf2 & (F.BUILD | F.VEHICLE | F.AIR);
+            damage(j, qdmg[p] * (heavy ? (kind === P.ROCKET ? 2.5 : 1.5) : 1), tm, kind === P.TSHELL);
+            if (tf2 & F.AIR) { G.fx.explosion(hx, hy - UALT[type[j]], 12, 1); freeProj(p); }
+            else endLin(p, true);
+            done = true; break;
+          }
           if (!isB && kind !== P.CANNON && deflect(j, dirx)) {
             if (kind === P.BBOLT && qpierce[p] > 0) { qpierce[p] = 0; continue; }
             done = true; freeProj(p); break;
@@ -769,7 +821,8 @@
       }
       if (done) continue;
       if (kind === P.CANNON) qz[p] = 1 + Math.abs(Math.sin(qt[p] * 9)) * 6 * Math.max(0, 1 - qt[p] / qT[p]);
-      if (qt[p] >= qT[p]) endLin(p, kind === P.FIREBALL || kind === P.CANNON);
+      else if (kind !== P.MISSILE && qz[p] > 7) qz[p] += (5 - qz[p]) * 0.1;
+      if (qt[p] >= qT[p]) endLin(p, kind === P.FIREBALL || kind === P.CANNON || kind === P.ROCKET || kind === P.TSHELL);
     }
   }
   function endLin(p, impact) {
@@ -777,6 +830,9 @@
     const kind = qkind[p];
     if (kind === P.FIREBALL) { S.explQ.push(qx[p], qy[p], qaoe[p] || 28, qdmg[p], qteam[p], 1, qsrc[p]); }
     else if (kind === P.CANNON) { S.explQ.push(qx[p], qy[p], 20, qdmg[p] * 0.5, qteam[p], 4, qsrc[p]); }
+    else if (kind === P.ROCKET) { S.explQ.push(qx[p], qy[p], qaoe[p] || 18, qdmg[p] * 0.45, qteam[p], 8, qsrc[p]); }
+    else if (kind === P.TSHELL) { S.explQ.push(qx[p], qy[p], qaoe[p] || 24, qdmg[p] * 0.55, qteam[p], 4 | 8, qsrc[p]); }
+    else if (kind === P.MISSILE) { G.fx.explosion(qx[p], qy[p] - qz[p], 12, 1); }
     else if (kind === P.FLAME) { if (rnd() < 0.25) ignite(tcell(Math.max(0, Math.min(W - 1, qx[p])), Math.max(0, Math.min(H - 1, qy[p])))); }
     else if (impact) G.fx.spark(qx[p], qy[p], 2);
     freeProj(p);
@@ -786,6 +842,11 @@
     const kind = qkind[p], tm = qteam[p];
     const lx = qx[p], ly = qy[p];
     if (kind === P.GRENADE) { S.explQ.push(lx, ly, qaoe[p], qdmg[p], tm, 0, qsrc[p]); freeProj(p); return; }
+    if (kind === P.SHELL || kind === P.MRL || kind === P.BOMB) {
+      S.explQ.push(lx, ly, qaoe[p], qdmg[p], tm, kind === P.MRL ? 8 : 4 | 8, qsrc[p]);
+      if (kind !== P.MRL || rnd() < 0.3) G.fx.decal(G.FR.crater, lx, ly, qaoe[p] * 0.8, qaoe[p] * 0.55, 0, 0x90ffffff);
+      freeProj(p); return;
+    }
     if (kind === P.STONE) {
       S.explQ.push(lx, ly, qaoe[p], qdmg[p], tm, 4, qsrc[p]);
       G.fx.decal(G.FR.crater, lx, ly, qaoe[p] * 0.9, qaoe[p] * 0.6, 0, 0xffffffff);
@@ -815,7 +876,7 @@
     atk[i] = 0.3;
     if (dx !== 0) face[i] = dx > 0 ? 1 : -1;
     const isB = UFL[t] & F.BUILD;
-    let sx = x[i], sy = y[i] - (isB ? 0 : 6);
+    let sx = x[i], sy = y[i] - (isB ? 0 : 6) - UALT[t];
     if (isB) {
       // shoot from a random spot on the building
       const r = UR[t];
@@ -823,7 +884,39 @@
     }
     // target velocity for leading
     const tvx = (x[j] - px[j]) / DT, tvy = (y[j] - py[j]) / DT;
-    switch (kind) {
+    let kd = kind;
+    const tfj = UFL[type[j]];
+    if (G.UNITS[t].k === 'heli' && !(tfj & (F.VEHICLE | F.BUILD | F.AIR))) { kd = P.BULLET; dmg = 10; shotCd = 0.16; }
+    switch (kd) {
+      case P.SHELL: case P.MRL: {
+        const n = kd === P.MRL ? 8 : 1;
+        for (let k = 0; k < n; k++) {
+          const T0 = d / ARC_SPD[kd] + 0.12;
+          const spr = kd === P.MRL ? d * 0.07 + 18 : d * 0.04 + 6;
+          const a = rnd() * 6.283, rr = rnd() * spr;
+          fireArc(kd, sx + (rnd() - 0.5) * 4, sy, x[j] + tvx * T0 + Math.cos(a) * rr, y[j] + tvy * T0 + Math.sin(a) * rr, tm, dmg, UAOE[t], ap, 10);
+        }
+        G.fx.muzzle(sx + face[i] * 10, sy - 6, face[i], kd === P.MRL ? 2.5 : 2);
+        G.fx.dust(x[i], y[i], 4);
+        break;
+      }
+      case P.ROCKET: case P.TSHELL: case P.MISSILE: {
+        const sp = LIN_SPD[kd];
+        const T0 = d / sp;
+        const ax = x[j] + tvx * T0 - x[i], ay = y[j] + tvy * T0 - y[i];
+        const al = Math.hypot(ax, ay) || 1;
+        const an = Math.atan2(ay, ax) + (rnd() - 0.5) * (kd === P.MISSILE ? 0.4 : 0.06);
+        const z0 = UALT[t] + (isB ? 6 : 6);
+        const p = fireLin(kd, sx, sy + UALT[t], Math.cos(an), Math.sin(an), tm, dmg, UAOE[t], 0, kd === P.MISSILE ? URNG[t] * 2.5 : Math.min(URNG[t] * 1.2, al + 30), 0, z0);
+        if (p >= 0 && kd === P.MISSILE) { qtg[p] = j; qvx[p] *= 0.4; qvy[p] = qvy[p] * 0.4 - 60; }
+        G.fx.muzzle(sx + Math.cos(an) * 8, sy + Math.sin(an) * 8, face[i], kd === P.TSHELL ? 2 : 1.2);
+        if (kd === P.ROCKET && !UALT[t]) G.fx.smokePuff(x[i] - face[i] * 6, y[i] - 6, 2);
+        break;
+      }
+      case P.BOMB: {
+        fireArc(P.BOMB, x[i], y[i], x[i] + (x[i] - px[i]) * 8, y[i] + (y[i] - py[i]) * 8, tm, dmg, UAOE[t], 0, UALT[t]);
+        break;
+      }
       case P.ARROW: case P.GRENADE: case P.STONE: case P.JAVELIN: {
         let T0 = d / ARC_SPD[kind] + 0.12;
         let tx = x[j] + tvx * T0, ty = y[j] + tvy * T0;
@@ -853,13 +946,16 @@
         break;
       }
       case P.BULLET: {
-        const spread = UFL[t] & F.PICKY ? 0.004 : 0.07;
+        const k = G.UNITS[t].k;
+        const spread = UFL[t] & F.PICKY ? 0.004 : k === 'mg' || k === 'jeep' ? 0.09 : k === 'aa' ? 0.035 : 0.05;
         hitscan(i, j, dmg, spread, ap);
         break;
       }
     }
   }
 
+  let shotCd = -1;
+  function nextCd(t) { const c = shotCd >= 0 ? shotCd : UCD[t]; shotCd = -1; return c; }
   function melee(i, j, mult) {
     curAtk = type[i];
     const t = type[i], fl = UFL[t], tj = type[j];
@@ -1051,22 +1147,22 @@
           const dx = x[tg] - x[i], dy = y[tg] - y[i];
           const dc = Math.sqrt(dx * dx + dy * dy);
           const d = dc - UR[type[tg]];
-          const kite = (fl & F.KITE) && d < (fl & F.MOUNTED ? 95 : 42) && !(UFL[type[tg]] & F.BUILD) && UBEH[type[tg]] !== B.RANGED;
+          const kite = (fl & F.KITE) && d < (fl & (F.MOUNTED | F.VEHICLE) ? 95 : 42) && !(UFL[type[tg]] & F.BUILD) && UBEH[type[tg]] !== B.RANGED;
           if (kite) {
             away(i, tg, 1);
-            if ((fl & F.MOVESHOOT) && cd[i] <= 0 && d <= URNG[t]) { shoot(i, tg); cd[i] = UCD[t] * (0.9 + rnd() * 0.2); }
+            if ((fl & F.MOVESHOOT) && cd[i] <= 0 && d <= URNG[t]) { shoot(i, tg); cd[i] = nextCd(t) * (0.9 + rnd() * 0.2); }
             else if (cd[i] <= 0 && d < 8) { melee(i, tg, 0.5); cd[i] = 1; }
             return;
           }
           if (d > URNG[t]) {
             if (stuck[i] > 0) followFlow(i); else toward(i, tg);
-            if ((fl & F.MOVESHOOT) && cd[i] <= 0 && d < URNG[t] * 1.1) { shoot(i, tg); cd[i] = UCD[t]; }
+            if ((fl & F.MOVESHOOT) && cd[i] <= 0 && d < URNG[t] * 1.1) { shoot(i, tg); cd[i] = nextCd(t); }
             return;
           }
           if (d < UMINR[t]) { away(i, tg, 0.8); return; }
           if (cd[i] <= 0) {
             shoot(i, tg);
-            let c = UCD[t] * (0.9 + rnd() * 0.2);
+            let c = nextCd(t) * (0.9 + rnd() * 0.2);
             if (buffed[i]) c *= 0.8;
             cd[i] = c;
           }
@@ -1200,6 +1296,48 @@
         followFlow(i);
         return;
       }
+      case B.DRONEK: {
+        if (tg >= 0) {
+          if (edgeDist(i, tg) <= 3) { kill(i, -1); return; }
+          toward(i, tg, 1);
+          return;
+        }
+        followFlow(i);
+        return;
+      }
+      case B.DRONEB: {
+        if (tg >= 0) {
+          if (cd[i] > 1.2) { away(i, tg, 0.9); return; }
+          const dx = x[tg] - x[i], dy = y[tg] - y[i];
+          if (dx * dx + dy * dy < 100) {
+            if (cd[i] <= 0) { shoot(i, tg); cd[i] = UCD[t] * (0.9 + rnd() * 0.2); }
+          }
+          toward(i, tg, 1);
+          return;
+        }
+        followFlow(i);
+        return;
+      }
+      case B.JET: {
+        if (dX[i] === 0 && dY[i] === 0) { dX[i] = x[i] < W / 2 ? 1 : -1; }
+        mvs = 1;
+        if (state[i] === 1) {
+          aux2[i] -= DT;
+          if (aux2[i] <= 0) { state[i] = 0; tgt[i] = -1; }
+        } else if (tg >= 0) {
+          const dx = x[tg] - x[i], dy = y[tg] - y[i], l = Math.hypot(dx, dy) || 1;
+          // limited turn rate
+          let hx = dX[i] + (dx / l) * 0.09, hy = dY[i] + (dy / l) * 0.09;
+          const hl = Math.hypot(hx, hy) || 1; dX[i] = hx / hl; dY[i] = hy / hl;
+          if (l < 40 && cd[i] <= 0) {
+            curAtk = t;
+            for (let k = 0; k < 3; k++) fireArc(P.BOMB, x[i], y[i], x[i] + dX[i] * (40 + k * 22), y[i] + dY[i] * (40 + k * 22), team[i], UDMG[t], UAOE[t], 0, UALT[t]);
+            cd[i] = UCD[t]; state[i] = 1; aux2[i] = 1.3;
+          }
+        }
+        mvx = dX[i]; mvy = dY[i];
+        return;
+      }
       case B.RAM: {
         if (tg >= 0) {
           const d = edgeDist(i, tg);
@@ -1236,6 +1374,13 @@
       if (burn[i] > 0 || fireT[tcell(x[i], y[i])] > 0) damage(i, 30 * DT, -1, true);
       return;
     }
+    if (fl & F.MINE) {
+      if (S.phase === 'battle' && ((S.tick + i) & 3) === 0) {
+        const j = hitAt(x[i], y[i], 3, team[i], -1, 0);
+        if (j >= 0 && !(UFL[type[j]] & F.BUILD)) kill(i, -1);
+      }
+      return;
+    }
     // spawning
     if (u.spawnIds && S.count < MAXU - 1000) {
       aux[i] -= DT;
@@ -1265,7 +1410,7 @@
         if (d <= URNG[t]) {
           shoot(i, tg);
           cd[i] = UCD[t] * (0.8 + rnd() * 0.4);
-          if (u.k === 'castle') tgt[i] = -1; // spread arrows
+          if (u.k === 'hq') tgt[i] = -1; // spread fire
         }
       }
     }
@@ -1303,7 +1448,8 @@
       const tt = terr[tci];
       buffed[i] = tm < 4 ? aura[c * 4 + tm] : 0;
       // environment
-      if (TWATER[tt]) burn[i] = 0;
+      if (fl & F.AIR) burn[i] = 0;
+      else if (TWATER[tt]) burn[i] = 0;
       else if (fireT[tci] > 0 && !(fl & F.FIREPROOF)) burn[i] = Math.max(burn[i], 2.5);
       if (burn[i] > 0) {
         curAtk = -1;
@@ -1313,7 +1459,7 @@
         if (((tick + i) & 3) === 0) G.fx.unitFire(x[i], y[i]);
         if (!alive[i]) continue;
       }
-      if (tt === T.SPIKES) { curAtk = -1; damage(i, (fl & F.MOUNTED ? 30 : 16) * DT, -1, false); if (!alive[i]) continue; }
+      if (tt === T.SPIKES && !(fl & F.AIR)) { curAtk = -1; damage(i, (fl & F.MOUNTED ? 30 : 16) * DT, -1, false); if (!alive[i]) continue; }
       if (tm < 4 && healm[c * 4 + tm] && hp[i] < UHP[t]) { hp[i] = Math.min(UHP[t], hp[i] + 7 * DT); if (((tick + i) & 63) === 0) G.fx.heal(x[i], y[i] - 8); }
 
       if (stun[i] > 0) {
@@ -1323,6 +1469,14 @@
       if (!alive[i]) continue;
 
       // ------------------------------------------- movement
+      if (fl & F.AIR) {
+        let ax = x[i] + mvx * USPD[t] * mvs * (buffed[i] ? 1.2 : 1) * DT, ay = y[i] + mvy * USPD[t] * mvs * (buffed[i] ? 1.2 : 1) * DT;
+        if (ax < 6 || ax > W - 6) { ax = Math.max(6, Math.min(W - 6, ax)); if (UBEH[t] === B.JET) { dX[i] = -dX[i]; state[i] = 0; } }
+        if (ay < 6 || ay > H - 6) { ay = Math.max(6, Math.min(H - 6, ay)); if (UBEH[t] === B.JET) { dY[i] = -dY[i]; state[i] = 0; } }
+        if (ax - x[i] > 0.3) face[i] = 1; else if (ax - x[i] < -0.3) face[i] = -1;
+        x[i] = ax; y[i] = ay;
+        continue;
+      }
       let sp = USPD[t] * TSPD[tt] * mvs;
       if (fl & F.MOUNTED && TSPD[tt] < 1) sp *= 0.7;
       if (buffed[i]) sp *= 1.2;
@@ -1350,6 +1504,7 @@
     }
 
     flushDeaths();
+    if (S.spawnQ.length) { const q = S.spawnQ; S.spawnQ = []; for (let k = 0; k < q.length; k += 4) if (!blockedAt(q[k + 2], q[k + 3])) S.spawn(q[k], q[k + 1], q[k + 2], q[k + 3]); }
     // ------------------------------------------- separation (half-neighbourhood)
     separate();
 
@@ -1377,7 +1532,7 @@
       sx[k] = x[i]; sy[k] = y[i];
       const t = type[i];
       if (!alive[i] || (UFL[t] & F.STATIC)) { sm[k] = 0; sr[k] = 0; }
-      else { sm[k] = UMASS[t]; sr[k] = UR[t]; }
+      else { sm[k] = UMASS[t]; sr[k] = UR[t]; if (UFL[t] & F.AIR) sm[k] = -sm[k]; }
     }
     // with very large armies, resolve half of the rows each tick (each pair still every 2 ticks)
     const half = n > 24000;
@@ -1404,8 +1559,10 @@
           if (cx + 1 < GW) { q0 = cellStart[sc + 1]; q1 = Math.min(cellStart[sc + 2], q0 + MAXN); }
         }
         for (let ka = a0; ka < a1; ka++) {
-          const mi = sm[ka];
+          let mi = sm[ka];
           if (mi === 0) continue;
+          const li = mi < 0;
+          if (li) mi = -mi;
           const xi = sx[ka], yi = sy[ka];
           let axi = 0, ayi = 0;
           const ri = sr[ka];
@@ -1417,8 +1574,9 @@
             else if (pass === 3) { b0 = w0; b1 = w1; }
             else { b0 = q0; b1 = q1; }
             for (let kb = b0; kb < b1; kb++) {
-              const mj = sm[kb];
-              if (mj === 0) continue;
+              let mj = sm[kb];
+              if (mj === 0 || (mj < 0) !== li) continue;
+              if (mj < 0) mj = -mj;
               const dx = sx[kb] - xi, dy = sy[kb] - yi;
               const rr = ri + sr[kb];
               const d2 = dx * dx + dy * dy;
@@ -1443,6 +1601,7 @@
       if (!alive[i]) continue;
       const ti = type[i];
       if (UFL[ti] & F.STATIC) continue;
+      if (UFL[ti] & F.AIR) { if (x[i] < 2) x[i] = 2; else if (x[i] > W - 2) x[i] = W - 2; if (y[i] < 2) y[i] = 2; else if (y[i] > H - 2) y[i] = H - 2; anim[i] += 1; continue; }
       let cx = (x[i] / GC) | 0, cy = (y[i] / GC) | 0;
       if (cx < 0) cx = 0; else if (cx >= GW) cx = GW - 1;
       if (cy < 0) cy = 0; else if (cy >= GH) cy = GH - 1;

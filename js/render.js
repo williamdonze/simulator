@@ -394,6 +394,10 @@
     smokePuff(x, y, n) {
       for (let k = 0; k < n; k++) P_(G.FR.smoke, x + (rnd() - 0.5) * 6, y - 4 + (rnd() - 0.5) * 6, 2, (rnd() - 0.5) * 30, (rnd() - 0.5) * 20, 10 + rnd() * 10, 0.6 + rnd() * 0.4, 6, 12, 0xd0e0e0e0, 0);
     },
+    trail(x, y) {
+      if (nfx > MAXFX * 0.7) return;
+      P_(G.FR.smoke, x + (rnd() - 0.5) * 2, y + (rnd() - 0.5) * 2, 0, 0, 0, 3, 0.5 + rnd() * 0.4, 2, 5, 0xc0e8e8e8, 0);
+    },
     heal(x, y) { P_(G.FR.heal, x + (rnd() - 0.5) * 6, y, 2, 0, 0, 18, 0.8, 3, 3, 0xffffffff, 0); },
     tracer(x0, y0, x1, y1) {
       const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy);
@@ -504,6 +508,7 @@
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     // ---------------- build instances
+    const now = performance.now() / 1000;
     ni = 0;
     let at = 0;
     const passes = [];
@@ -518,8 +523,19 @@
       if (k === P.FLAME || k === P.FIREBALL) continue;
       const x = pr.px[p] + (pr.x[p] - pr.px[p]) * alpha, y = pr.py[p] + (pr.y[p] - pr.py[p]) * alpha;
       if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
-      const big = k === P.STONE || k === P.CANNON || k === P.BBOLT;
+      const big = k === P.STONE || k === P.CANNON || k === P.BBOLT || k === P.SHELL || k === P.BOMB || k === P.MISSILE;
       put(x, y, big ? 5 : 3, big ? 2 : 1.2, 0, FR.shadow, 0xffffffff, MISC_MULT, 0);
+    }
+    // aircraft shadows
+    {
+      const ux = S.x, uy = S.y, upx = S.px, upy = S.py, ut = S.type, ual = S.alive, UFL = G.UFL, UR = G.UR;
+      for (let i = 0, n = S.hw; i < n; i++) {
+        if (!ual[i] || !(UFL[ut[i]] & F.AIR)) continue;
+        const x = upx[i] + (ux[i] - upx[i]) * alpha, y = upy[i] + (uy[i] - upy[i]) * alpha;
+        if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
+        const r = UR[ut[i]];
+        put(x, y, r * 2.4, r * 0.8, 0, FR.shadow, 0xb0ffffff, MISC_MULT, 0);
+      }
     }
     passes.push([at, flushPlain(start, at)]); at += ni - start;
 
@@ -543,7 +559,13 @@
       if (y < vy0 || y > vy1) continue;
       const t = ut[i];
       const fl = UFL[t];
-      let f, bob = 0;
+      let f, bob = 0, key = (y + 64) | 0;
+      if (fl & F.AIR) {
+        const alt = G.UALT[t];
+        f = UF[t * 3 + (uatk[i] > 0 ? 2 : (((now * 24) | 0) + i) & 1)];
+        put(x, y - alt + Math.sin(now * 3 + i) * 1.2, fw[f] * uface[i], fh[f], 0, f, TEAMC[utm[i]], misc(ufl[i] > 0 ? 170 : 0, 0, 0, 255), Math.min(NKEY - 1, key + 2200));
+        continue;
+      }
       if (fl & F.BUILD) f = UF[t * 3];
       else if (uatk[i] > 0) f = UF[t * 3 + 2];
       else {
@@ -564,7 +586,12 @@
       if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
       const z = pr.pz[p] + (pr.z[p] - pr.pz[p]) * alpha;
       let rot, f, w, h, col = 0xffffffff, m = MISC_MULT;
-      if (k === P.ARROW || k === P.JAVELIN || k === P.GRENADE || k === P.STONE) {
+      if (k === P.SHELL || k === P.MRL || k === P.BOMB) {
+        const ox = pr.px[p], oy = pr.py[p] - pr.pz[p];
+        rot = Math.atan2(pr.y[p] - pr.z[p] - oy, pr.x[p] - ox);
+        f = k === P.SHELL ? FR.shell : k === P.MRL ? FR.mrl : FR.bomb;
+        if (k === P.MRL && simDt > 0 && rnd() < 0.4) fx.trail(x, y - z);
+      } else if (k === P.ARROW || k === P.JAVELIN || k === P.GRENADE || k === P.STONE) {
         const T0 = pr.T[p], tt = Math.min(1, pr.t[p] / T0);
         const ddx = (pr.tx[p] - pr.sx[p]) / T0, ddy = (pr.ty[p] - pr.sy[p]) / T0;
         const dz = pr.h[p] * 4 * (1 - 2 * tt) / T0 - 6 / T0;
@@ -577,6 +604,9 @@
           case P.BOLT: f = FR.bolt; break;
           case P.BBOLT: f = FR.bbolt; col = TEAMC[pr.team[p]]; m = MISC_TEAM; break;
           case P.CANNON: f = FR.ball; break;
+          case P.TSHELL: f = FR.shell; break;
+          case P.ROCKET: f = FR.rocket; if (simDt > 0 && rnd() < 0.6) fx.trail(x, y - z); break;
+          case P.MISSILE: f = FR.missile; if (simDt > 0) fx.trail(x, y - z); break;
           case P.SHURIKEN: f = FR.shuriken; rot = pr.t[p] * 25; break;
           case P.FIREBALL: f = FR.fireball; m = MISC_ADD; col = 0xff40b0ff; break;
           case P.FLAME: {
