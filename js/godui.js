@@ -68,7 +68,8 @@
     panel.querySelectorAll('.gp').forEach((b) => (b.onclick = () => {
       state.id = b.dataset.p; state.rad = null; state.days = null;
       const p = G.powers.get(state.id);
-      if (needsPos(p)) { ui.tool = { kind: 'power', id: p.id }; GU.pending = null; } else cancelAim();
+      if (needsPos(p)) { ui.tool = { kind: 'power', id: p.id }; GU.pending = null; startAim(); return; }
+      cancelAim();
       render();
     }));
     const on = (id, ev, fn) => { const e = $(id); if (e) e[ev] = fn; };
@@ -82,6 +83,16 @@
     on('#gGo', 'onclick', () => activate());
   }
   function cancelAim() { GU.pending = null; confirmBar.classList.remove('show'); if (ui.tool.kind === 'power') ui.tool = { kind: 'grab' }; }
+  // aiming: the panel folds away so the whole map is free; a bar explains what to do
+  function startAim() {
+    const p = G.powers.get(state.id);
+    panel.classList.remove('show');
+    const msg = G.powers.check(p.id, ctxFor(p));
+    confirmBar.innerHTML = `${G.ico(p.icon)} <b>${p.name}</b> <span>${msg ? `<em class="warn">${msg}</em>` : 'Touche la carte à l\'endroit voulu'}</span><button class="alt">Réglages</button><button class="no">Terminer</button>`;
+    confirmBar.classList.add('show', 'aim');
+    confirmBar.querySelector('.alt').onclick = () => { panel.classList.add('show'); render(); };
+    confirmBar.querySelector('.no').onclick = () => { cancelAim(); btn.classList.remove('on'); };
+  }
   // map click with a positional power: place the target, then ask for confirmation
   const confirmBar = el('div', 'panel', '');
   confirmBar.id = 'gconfirm';
@@ -91,10 +102,11 @@
     if (!p) return;
     GU.pending = { x, y, r: GU.radius() };
     const msg = G.powers.check(p.id, ctxFor(p));
-    confirmBar.innerHTML = `${G.ico(p.icon)} <b>${p.name}</b> <span>${G.regions.name(G.regions.at(x, y))}${msg ? ` — <em class="warn">${msg}</em>` : ''}</span><button class="go" ${msg ? 'disabled' : ''}>Activer</button><button class="no">Annuler</button>`;
-    confirmBar.classList.add('show');
+    panel.classList.remove('show');
+    confirmBar.innerHTML = `${G.ico(p.icon)} <b>${p.name}</b> <span>${G.regions.name(G.regions.at(x, y))}${msg ? ` — <em class="warn">${msg}</em>` : ''}</span><button class="go" ${msg ? 'disabled' : ''}>Activer ici</button><button class="no">Annuler</button>`;
+    confirmBar.classList.add('show'); confirmBar.classList.remove('aim');
     confirmBar.querySelector('.go').onclick = () => activate(GU.pending);
-    confirmBar.querySelector('.no').onclick = () => { GU.pending = null; confirmBar.classList.remove('show'); };
+    confirmBar.querySelector('.no').onclick = () => { GU.pending = null; startAim(); };
   };
   function activate(pos) {
     const p = G.powers.get(state.id);
@@ -103,8 +115,9 @@
     const r = G.powers.use(p.id, c);
     if (!r.ok) ui.toast(`alert|${r.msg}`);
     else { if (!ui.running) document.querySelector('#start').click(); if (window.G.ui.mark) ui.mark('god'); }
-    GU.pending = null; confirmBar.classList.remove('show');
-    render();
+    GU.pending = null;
+    // positional power: stay in aiming mode to place it again; global power: back to the panel
+    if (pos && ui.tool.kind === 'power') startAim(); else { confirmBar.classList.remove('show'); render(); }
   }
 
   // ------------------------------------------------------------------ live feed

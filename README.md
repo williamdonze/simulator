@@ -10,8 +10,8 @@ Ouvre `index.html` dans un navigateur récent (WebGL2). Aucune installation. Le 
 - **Lancer la vie**, puis accélère le temps (×4, ×16, ×64 ≈ 2 min par an) ou fais un voyage dans le temps.
 - **Calendrier réel** : années de 364 jours, saisons de 3 mois, dates. Un jour dure 24 s à ×1. Âges, gestations, maturité et longévité suivent la vraie biologie (un cerf vit une dizaine d'années, un lapin deux, une souris un an).
 - **Zoom** : molette (vers le curseur), boutons + / − / ⤢, ou pincement sur mobile. **Se déplacer** : clic droit ou molette enfoncée, Espace + glisser, deux doigts.
-- **Pouvoirs divins** (bouton étoile en bas à droite) : 34 pouvoirs en six catégories (Création, Destruction, Climat, Vie, Évolution, Monde). Choisis un pouvoir, règle ses paramètres (espèce, caractère, sens…), vise sur la carte (le cercle montre la zone), puis confirme. Trois modes :
-  - **Libre** : interventions illimitées ;
+- **Pouvoirs divins** (bouton étoile en bas à droite) : 34 pouvoirs en six catégories (Création, Destruction, Climat, Vie, Évolution, Monde). Choisis un pouvoir et règle ses paramètres (espèce, caractère, sens…). Pour un pouvoir à placer, le panneau se replie : touche la carte (le cercle montre la zone), puis appuie sur « Activer ici ». Tu peux le placer plusieurs fois de suite, puis appuyer sur « Terminer ». Les pouvoirs globaux s'activent avec le bouton du panneau. Trois modes :
+  - **Libre** (par défaut) : interventions illimitées ;
   - **Divin équilibré** : énergie divine qui se recharge (plus vite quand le monde est calme), et temps de recharge ;
   - **Expérimental** : intensité, rayon et durée réglables.
 - **Fil d'actualité** (à droite) : les événements importants de la vallée. Clique dessus pour y envoyer la caméra.

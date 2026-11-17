@@ -218,7 +218,8 @@
   .ghint { color: var(--muted); font-weight: 500; margin: 2px 0 0; } .warn { color: #c0392b; font-style: normal; }
   #god .go, #gconfirm .go { background: #6a4fbf; color: #fff; padding: 8px 12px; border-radius: 10px; display: flex; gap: 6px; align-items: center; justify-content: center; } #god .go:disabled, #gconfirm .go:disabled { opacity: .45; }
   #gconfirm { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(max(16px, env(safe-area-inset-bottom)) + 150px); padding: 8px 10px; display: none; gap: 8px; align-items: center; z-index: 9; font-size: 13px; max-width: calc(100vw - 32px); }
-  #gconfirm.show { display: flex; } #gconfirm .ic { width: 18px; height: 18px; color: #6a4fbf; } #gconfirm span { color: var(--muted); font-weight: 500; } #gconfirm .no { padding: 8px 10px; border-radius: 10px; background: var(--line); }
+  #gconfirm.show { display: flex; } #gconfirm .alt { padding: 8px 10px; border-radius: 10px; background: #ece5ff; color: #6a4fbf; }
+  #gconfirm.aim { box-shadow: 0 0 0 3px #6a4fbf, var(--shadow); } #gconfirm .ic { width: 18px; height: 18px; color: #6a4fbf; } #gconfirm span { color: var(--muted); font-weight: 500; } #gconfirm .no { padding: 8px 10px; border-radius: 10px; background: var(--line); }
   #feed { position: fixed; right: 12px; top: calc(max(12px, env(safe-area-inset-top)) + 112px); width: 270px; display: grid; gap: 6px; z-index: 4; pointer-events: none; }
   .fi { pointer-events: auto; display: flex; gap: 8px; background: rgba(255,255,255,.94); border-radius: 12px; padding: 7px 9px; box-shadow: var(--shadow); font-size: 12px; border-left: 4px solid #8a8494; animation: fin .4s ease; }
   .fi.go { cursor: pointer; } .fi.go:hover { background: #fff; }
