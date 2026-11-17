@@ -35,7 +35,7 @@
   // plain world state (everything that is not a per-animal or per-cell array)
   const KEYS = ['time', 'tick', 'weather', 'weatherT', 'weatherStart', 'rain', 'snow', 'wind', 'flags', 'maxAnimals', 'lastDay', 'hist', 'histT',
     'history', 'geneHist', 'seen', 'genRec', 'tally', 'world', 'cataRate', 'immigration', 'lastCata', 'counts',
-    'climate', 'director', 'spMod', 'zones', 'notables', 'spHist', 'mana', 'godMode', 'regionStats', 'basin', 'fert', 'dirMem', 'migMem', 'metrics', 'regGrow', 'godTemp', 'godWet', 'godRain', 'selK', 'powerCd'];
+    'climate', 'director', 'spMod', 'zones', 'notables', 'spHist', 'mana', 'godMode', 'regionStats', 'basin', 'fert', 'dirMem', 'migMem', 'metrics', 'regGrow', 'godTemp', 'godWet', 'godRain', 'selK', 'powerCd', 'godTimers'];
   G.save = {
     serialize() {
       const S = G.S;

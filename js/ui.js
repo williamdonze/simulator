@@ -18,8 +18,7 @@
 
   // ------------------------------------------------------------------ tabs
   const TABS = [
-    { name: 'Outils', tools: ['grab', 'rain', 'fire', 'erase'] },
-    { name: 'Catastrophes', tools: ['drought', 'flood', 'storm', 'winter', 'epidemic', 'bigfire'] },
+    { name: 'Outils', tools: ['grab', 'inspect', 'rain', 'fire', 'erase'] },
     { name: 'Plantes', terrain: ['GRASS', 'TALL', 'FLOWERS', 'BUSH', 'FOREST', 'REEDS'], items: ['hive'] },
     { name: 'Herbivores', items: ['rabbit', 'mouse', 'squirrel', 'deer', 'boar', 'bison', 'beaver'] },
     { name: 'Prédateurs', items: ['fox', 'wolf', 'lynx', 'bear'] },
@@ -37,8 +36,9 @@
     epidemic: ['Épidémie', 'virus', 'Une maladie frappe l\'espèce la plus nombreuse. L\'immunité fait la différence.'],
     bigfire: ['Grand incendie', 'flame', 'Plusieurs départs de feu en forêt.'],
   };
-  const CATA_TOOL = { drought: 'drought', flood: 'flood', storm: 'storm', winter: 'winter', epidemic: 'epidemic', bigfire: 'fire' };
-  let curTab = 2;
+  const CATA_TOOL = {};
+  TOOLS.inspect = ['Inspecter', 'search', 'Clique sur une région pour voir son état, ses espèces, ses risques ; sur un animal pour sa fiche.'];
+  let curTab = 1;
 
   const iconCache = {};
   function unitIcon(id) {
@@ -100,13 +100,6 @@
     };
     for (const k of tab.tools || []) add(TOOLS[k][0], TOOLS[k][2], G.icoURL(TOOLS[k][1]), ui.tool.kind === k, () => {
       if (k === 'rain') { S.makeRain(); toast(S.season() === 3 ? 'cloudsnow|Il neige…' : 'rain|Il pleut : l\'herbe pousse deux fois plus vite.'); return; }
-      if (CATA_TOOL[k]) {
-        if (S.cata) { toast('alert|Une catastrophe est déjà en cours.'); return; }
-        S.startCatastrophe(S.season(), CATA_TOOL[k]);
-        if (!S.cata && k === 'epidemic') toast('alert|Aucune espèce n\'est assez nombreuse pour une épidémie.');
-        if (!ui.running) setRunning(true);
-        return;
-      }
       ui.tool = { kind: k };
     });
     for (const k of tab.terrain || []) {
@@ -158,6 +151,8 @@
   function stamp(wx, wy, first) {
     const tool = ui.tool, rb = ui.brush;
     if (tool.kind === 'terrain') { S.paintTerrain(wx, wy, rb, tool.id); return; }
+    if (tool.kind === 'power') { if (first && G.godui) G.godui.aim(wx, wy); return; }
+    if (tool.kind === 'inspect') { if (first && G.godui) { const i = S.pick(wx, wy, Math.max(10, 22 / G.cam.zoom)); if (i >= 0) select(i); else G.godui.inspectRegion(G.regions.at(wx, wy)); } return; }
     if (tool.kind === 'erase') { S.eraseAt(wx, wy, rb); S.paintTerrain(wx, wy, rb, T.GRASS); return; }
     if (tool.kind === 'fire') { S.igniteAt(wx, wy, Math.min(rb, 16)); G.fx.sparkle(wx, wy, 6); return; }
     if (tool.kind !== 'unit') return;
@@ -365,6 +360,7 @@
     ['gen10', 'dna', 'Lignée', 'Une 10e génération.', null],
     ['evolve', 'trend', 'Évolution', 'Une espèce change nettement en quelques générations.', null],
     ['comeback', 'compass', 'Le retour', 'Une espèce disparue revient d\'ailleurs.', 'venus d\'ailleurs'],
+    ['god', 'sparkle', 'Main divine', 'Utilise un pouvoir divin.', null],
   ];
   let found = {};
   try { found = JSON.parse(localStorage.getItem('petitmonde.carnet') || '{}'); } catch (e) { found = {}; }
@@ -527,7 +523,7 @@
       ctx.stroke();
     }
     // catastrophes as markers
-    for (const e of S.history) if (S.CATA && Object.values(S.CATA).some((c) => c.icon === e.icon) && e.d >= t0) { ctx.fillStyle = '#e8584a'; ctx.beginPath(); ctx.arc(X(e.d), pad.t + 4, 3.5, 0, 6.3); ctx.fill(); }
+    for (const e of S.history) if (e.kind === 'event' && e.cat === 'Catastrophe' && e.d >= t0) { ctx.fillStyle = '#e8584a'; ctx.beginPath(); ctx.arc(X(e.d), pad.t + 4, 3.5, 0, 6.3); ctx.fill(); }
     const leg = $('#legend');
     leg.innerHTML = '';
     for (const k of GRAPH_SP) {
@@ -591,18 +587,27 @@
     }
     $('#gnote').innerHTML = `Valeur moyenne de chaque gène chez les ${S.plural(t)} (0 = moyenne de départ de l'espèce). Génération la plus avancée : <b>${last ? last.g[t] : 1}</b>. Les gènes passent des deux parents aux petits, avec des mutations ; ceux qui aident à survivre et à se reproduire se répandent.`;
   }
+  let chronMin = 2;
   function drawChron() {
     const el = $('#chron');
-    const list = S.history.slice().reverse();
-    el.innerHTML = (S.world ? `<div class="wbar">Monde n° <b>${S.world.seed}</b> <button id="replay">Rejouer ce monde</button><small>même terrain et mêmes animaux au départ ; la suite ne sera jamais identique</small></div>` : '') + (list.length ? list.map((e) => `<div class="ce">${G.ico(e.icon)}<i>${fmtDate(e.d)}</i><span>${e.text}</span></div>`).join('') : '<p class="empty">Rien de notable pour l\'instant. Les catastrophes, disparitions, retours d\'espèces et grandes lignées s\'inscriront ici.</p>');
+    const list = S.history.filter((e) => e.sev >= chronMin).reverse();
+    const sevCls = (v) => (v >= 4 ? 's4' : v >= 3 ? 's3' : v >= 2 ? 's2' : 's1');
+    el.innerHTML = (S.world ? `<div class="wbar">Monde n° <b>${S.world.seed}</b> <button id="replay">Rejouer ce monde</button>
+      <span class="chf"><button data-m="1" class="${chronMin === 1 ? 'on' : ''}">Tout</button><button data-m="2" class="${chronMin === 2 ? 'on' : ''}">Important</button><button data-m="3" class="${chronMin === 3 ? 'on' : ''}">Majeur</button></span>
+      <small>Rejouer : même terrain et mêmes animaux au départ ; la suite ne sera jamais identique si tu interviens. Clique sur un événement pour y aller.</small></div>` : '') +
+      (list.length ? list.map((e, k) => `<div class="ce ${e.x != null ? 'go' : ''}" data-k="${k}">${G.ico(e.icon)}<i>${fmtDate(e.d)}${e.r >= 0 ? `<br>${G.regions.name(e.r)}` : ''}</i><span>${e.title ? `<b class="${sevCls(e.sev)}">${e.title}</b> ` : ''}${e.source === 'player' ? '<em class="god">intervention divine</em> ' : ''}${e.text}${e.cons && e.cons.length ? `<small class="cons">→ ${e.cons.join(' · ')}</small>` : ''}</span></div>`).join('')
+        : '<p class="empty">Rien de notable pour l\'instant. Catastrophes, migrations, extinctions, adaptations et interventions divines s\'inscriront ici.</p>');
     const rb = $('#replay'); if (rb) rb.onclick = () => { $('#graph').classList.remove('show'); newWorld(S.world.opts); };
+    el.querySelectorAll('.chf button').forEach((b) => (b.onclick = () => { chronMin = +b.dataset.m; drawChron(); }));
+    el.querySelectorAll('.ce.go').forEach((d) => (d.onclick = () => { const e = list[+d.dataset.k]; $('#graph').classList.remove('show'); ui.flyTo(e.x, e.y); }));
     $('#legend').innerHTML = ''; $('#gnote').textContent = '';
   }
+  ui.flyTo = function (x, y) { if (x == null) return; if (G.cam.zoom < fitZoom() * 1.8) { G.cam.zoom = fitZoom() * 2.2; updateZoomUi(); } ui.flyT = { x, y }; ui.follow = false; };
   function drawGraph() {
     document.querySelectorAll('#gtabs button').forEach((b) => b.classList.toggle('on', b.dataset.g === gTab));
-    $('#graphCv').style.display = gTab === 'chron' ? 'none' : 'block';
-    $('#chron').style.display = gTab === 'chron' ? 'block' : 'none';
-    if (gTab === 'pop') drawPop(); else if (gTab === 'evo') drawEvo(); else drawChron();
+    $('#graphCv').style.display = gTab === 'chron' || gTab === 'eco' ? 'none' : 'block';
+    $('#chron').style.display = gTab === 'chron' || gTab === 'eco' ? 'block' : 'none';
+    if (gTab === 'pop') drawPop(); else if (gTab === 'evo') drawEvo(); else if (gTab === 'eco' && G.godui) G.godui.drawEco(); else drawChron();
   }
   function openGraph(tab) { if (tab) gTab = tab; $('#graph').classList.add('show'); drawGraph(); }
   ui.openGraph = openGraph;
@@ -687,9 +692,9 @@
       <div><b>${Math.max(...b.gmax)}</b><span>génération max.</span></div><div><b>${Math.round(a.forest * 100)} → ${Math.round(b.forest * 100)} %</b><span>de forêt</span></div></div>`;
     const dl = Object.entries(dc).filter(([, n]) => n > 0).sort((x, y) => y[1] - x[1]).map(([k, n]) => `${n.toLocaleString('fr-FR')} ${causes[k] || k}`);
     if (dl.length) h += `<p class="rp">Causes de mort : ${dl.join(' · ')}.</p>`;
-    const ev = S.history.slice(a.hist);
+    const ev = S.history.filter((e) => e.d >= a.time / G.DAY && e.sev >= 2);
     h += `<div class="sect">Ce qui s'est passé</div>`;
-    h += ev.length ? `<div class="rev">${ev.map((e) => `<div class="ce">${G.ico(e.icon)}<i>${fmtDate(e.d)}</i><span>${e.text}</span></div>`).join('')}</div>` : '<p class="rp">Des années calmes : aucune catastrophe, aucune disparition.</p>';
+    h += ev.length ? `<div class="rev">${ev.map((e) => `<div class="ce">${G.ico(e.icon)}<i>${fmtDate(e.d)}</i><span>${e.title ? `<b>${e.title}</b> ` : ''}${e.text}</span></div>`).join('')}</div>` : '<p class="rp">Des années calmes : aucune catastrophe, aucune disparition.</p>';
     // evolution
     const evo = [];
     let bigChange = false;
@@ -763,8 +768,18 @@
       let r = ui.brush;
       if (ui.tool.kind === 'unit' && G.UNITS[ui.tool.id].flags & F.HIVE) r = 5;
       if (ui.tool.kind === 'fire') r = Math.min(r, 16);
-      ui.brushPreview = { x: wx, y: wy, r, col: 0xff302830 };
+      if (ui.tool.kind === 'power') r = G.godui ? G.godui.radius() : 30;
+      if (ui.tool.kind === 'inspect') r = 0;
+      ui.brushPreview = r ? { x: wx, y: wy, r, col: ui.tool.kind === 'power' ? 0xff3cc8ff : 0xff302830 } : null;
     } else ui.brushPreview = null;
+    if (G.godui && G.godui.pending) { const p = G.godui.pending; ui.brushPreview = { x: p.x, y: p.y, r: p.r, col: 0xff3c50e8 }; }
+    // camera travel to an event
+    if (ui.flyT) {
+      const w = cv.clientWidth / G.cam.zoom, h = cv.clientHeight / G.cam.zoom;
+      G.cam.x += (ui.flyT.x - w / 2 - G.cam.x) * 0.15; G.cam.y += (ui.flyT.y - h / 2 - G.cam.y) * 0.15;
+      if (Math.hypot(ui.flyT.x - w / 2 - G.cam.x, ui.flyT.y - h / 2 - G.cam.y) < 2) ui.flyT = null;
+      clampCam();
+    }
     cv.style.cursor = mode === 'pan' ? 'grabbing' : ui.tool.kind === 'grab' ? (mode === 'drag' ? 'grabbing' : 'grab') : 'crosshair';
     for (const m of S.events.splice(0)) if (m) toast(m);
     // follow camera
@@ -782,13 +797,13 @@
       const hh = Math.floor(hh0), mm = Math.floor((hh0 - hh) * 60 / 15) * 15;
       const wx = S.rain > 0.3 ? (S.weather === 'snow' ? 'cloudsnow' : S.weather === 'storm' ? 'storm' : 'rain') : S.isNight() ? 'moon' : 'sun';
       const yd = G.SEASON_DAYS * 4;
-      $('#clock').innerHTML = `<b>${G.date(day)}</b> · an ${Math.floor(day / yd) + 1} · ${G.ico(SEASON_ICON[se])} ${SEASONS[se]} · ${G.ico(wx)} ${String(hh).padStart(2, '0')}h${String(mm).padStart(2, '0')}${S.cata ? ` · <span class="cata">${G.ico(S.CATA[S.cata.kind].icon)} ${S.CATA[S.cata.kind].name}</span>` : ''}`;
+      $('#clock').innerHTML = `<b>${G.date(day)}</b> · an ${Math.floor(day / yd) + 1} · ${G.ico(SEASON_ICON[se])} ${SEASONS[se]} · ${G.ico(wx)} ${String(hh).padStart(2, '0')}h${String(mm).padStart(2, '0')}${S.temp != null ? ` · ${Math.round(S.temp)} °C` : ''}${(() => { const a = S.director ? S.director.active.filter((e) => G.EVENT[e.id].sev >= 3) : []; return a.length ? ` · <span class="cata">${G.ico(G.EVENT[a[0].id].icon)} ${G.EVENT[a[0].id].name}${a.length > 1 ? ` +${a.length - 1}` : ''}</span>` : ''; })()}`;
       let n = 0;
       for (let t = 0; t < G.NSP; t++) if (!(G.UFL[t] & F.STATIC)) n += S.counts[t];
       $('#pop').textContent = `${n.toLocaleString('fr-FR')} animaux`;
       if ($('#graph').classList.contains('show')) drawGraph();
       if (!found.birth) { for (let k = 0; k < S.hw; k++) if (S.alive[k] && S.stats.gen[k] > 1) { mark('birth'); break; } }
-      if (S.cata && !found.cata) mark('cata');
+      if (!found.cata && S.director && S.director.active.some((e) => G.EVENT[e.id].cat === 'catastrophe')) mark('cata');
       if (!found.gen10 && S.genRec && S.genRec.some((g) => g >= 10)) mark('gen10');
       if (!found.hunt) { for (let k = 0; k < S.hw; k++) if (S.alive[k] && S.kills[k] > 0) { mark('hunt'); break; } }
     }

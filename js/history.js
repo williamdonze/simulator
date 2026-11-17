@@ -97,7 +97,7 @@
   G.bus.on('climate', ({ to }) => H.add({ icon: to === 'sec' || to === 'chaud' ? 'sun' : to === 'humide' ? 'droplets' : to === 'froid' ? 'snow' : 'leaf', title: 'Le climat change', text: `Le climat bascule : ${G.climate.REGIMES[to].name}. Ce régime peut durer plusieurs années.`, sev: 2 }));
   G.bus.on('immigration', ({ t, n, x, y }) => H.add({ icon: 'u:' + G.UNITS[t].k, title: 'Retour d\'une espèce', text: `${n} ${G.S.plural(t)} venu${G.S.e(t)}s d'ailleurs recolonisent la vallée.`, sev: 2, x, y, sp: t }));
   G.bus.on('migration', (m) => { if (m.n >= 6 && m.kind !== 'seasonal' && m.n < 15) H.add({ icon: 'foot', title: 'Migration', text: `${m.n} ${G.S.plural(m.t)} quittent ${G.regions.name(m.from)} pour ${G.regions.name(m.to)} (${m.why}).`, sev: 1, x: m.x, y: m.y, r: m.to, sp: m.t }); });
-  G.bus.on('power', (p) => H.add({ icon: p.icon, title: 'Intervention divine', text: p.text, sev: 2, x: p.x, y: p.y, r: p.x != null ? G.regions.at(p.x, p.y) : -1, source: 'player', cons: p.cons || [] }));
+  G.bus.on('power', (p) => !p.quiet && H.add({ icon: p.icon, title: 'Intervention divine', text: p.text, sev: 2, x: p.x, y: p.y, r: p.x != null ? G.regions.at(p.x, p.y) : -1, source: 'player', cons: p.cons || [] }));
   G.bus.on('reset', () => H.reset());
   G.bus.on('day', ({ d }) => H.daily(d));
 })();

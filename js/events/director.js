@@ -96,6 +96,8 @@
       if (def.needWhen && !player && !(def.when(m, ctx) > 0)) return null; // a consequence only happens if the world really is in that state
       const tgt = def.target(m, ctx);
       if (!tgt) return null;
+      // the player chose the place
+      if (player && ctx.x != null && tgt.r !== -1 && !['eruption', 'landslide', 'mutation'].includes(id)) { tgt.x = ctx.x; tgt.y = ctx.y; tgt.r = G.regions.at(ctx.x, ctx.y); if (ctx.rad) tgt.rad = ctx.rad; }
       const ev = Object.assign({ uid: ++d.uid, id, t0: day, age: 0, sp: ctx.sp, ctx, source: ctx.source || (ctx.chained ? 'chain' : 'nature'), cause: ctx.cause }, tgt);
       if (ev.r == null) ev.r = -1;
       if (ev.x == null && ev.r >= 0) [ev.x, ev.y] = G.regions.center(ev.r);
