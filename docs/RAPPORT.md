@@ -99,3 +99,28 @@ Lancer `node tests/run.js` (complet) ou `node tests/run.js quick`. Résultat de 
 4. Améliorer l'accord grammatical (noms des individus selon le sexe, par exemple).
 5. Afficher sur la carte les zones divines actives et l'épicentre des événements (pour l'instant, seulement dans l'inspecteur et la chronique).
 6. Indiquer à l'écran quand l'avance rapide ne tient pas la vitesse demandée.
+
+## Dernière exécution de la suite complète
+
+```
+  ok   génération d'un monde — 67 animaux, eau 0 %, forêt 56 % (0.0 s)
+  ok   reproductibilité (même seed ⇒ même histoire) — 2078999980:285 (1.7 s)
+  ok   mondes variés (eau) — sec 0.0 % / humide 25.5 % (0.0 s)
+  ok   reproduction et mortalité sur un an — 433 naissances, 515 morts (8.8 s)
+  ok   sauvegarde / chargement — 440 Ko (0.4 s)
+  ok   chaque événement du catalogue peut se déclencher sans casser le monde — 27 déclenchés, non applicables ici : mutation, adaptation, divergence (7.5 s)
+  ok   effets réels : sécheresse, inondation, incendie, séisme — ok (0.5 s)
+  ok   chaînes de conséquences (pluies torrentielles → crue, fin → suites) — conséquences programmées : landslide (0.2 s)
+  ok   migrations collectives — rabbit 1, beaver 1 (0.3 s)
+      seed 1: 113 évts (massMigration×12 extinction×5 flood×2 overpop×12 boom×7 regionalExtinction×17 deluge×1 landslide×1 mutation×3 epidemic×12 parasites×2 preyCollapse×5 expansion×3 recolonisation×11 divergence×4 wetPeriod×1 adaptation×5 drought×2 storm×3 wildfire×2 harshWinter×1 inbreeding×1 renewal×1), 718 animaux, 19 s/an
+      seed 2: 113 évts (massMigration×5 extinction×8 deluge×2 parasites×2 mutation×4 boom×6 landslide×3 flood×2 overpop×9 regionalExtinction×24 epidemic×7 storm×1 recolonisation×13 invasion×2 inbreeding×3 wetPeriod×1 adaptation×8 preyCollapse×4 expansion×2 heatwave×2 wildfire×1 divergence×3 earthquake×1), 384 animaux, 17 s/an
+      seed 3: 97 évts (massMigration×9 boom×7 overpop×4 extinction×6 regionalExtinction×23 expansion×3 inbreeding×1 parasites×3 epidemic×6 recolonisation×16 preyCollapse×3 flood×3 adaptation×5 wetPeriod×2 divergence×1 mutation×1 invasion×1 landslide×1 deluge×1 harshWinter×1), 236 animaux, 27 s/an
+      seed 4: 130 évts (massMigration×5 mutation×3 extinction×10 boom×8 overpop×13 deluge×2 regionalExtinction×30 flood×1 expansion×4 epidemic×9 preyCollapse×5 inbreeding×6 invasion×2 recolonisation×21 divergence×4 parasites×1 adaptation×4 landslide×1 storm×1), 1204 animaux, 34 s/an
+  ok   directeur : plusieurs seeds, événements variés et rares — 26 types d'événements différents (290.4 s)
+  ok   grande population (performance) — 2207 animaux, 1.26 ms par pas (0.8 s)
+  ok   pouvoirs divins — 34/34 pouvoirs (0.9 s)
+  ok   simulation longue (10 ans) — 700 animaux, 549 entrées de chronique, 438 événements, 134 s (134.2 s)
+
+13 réussis, 0 échoués
+EXIT 0
+```
