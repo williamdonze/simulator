@@ -85,6 +85,22 @@
     if (!urlCache[k]) urlCache[k] = 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -4 32 32" width="96" height="96" fill="none" stroke="${color || '#2b2433'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${I[name] || I.sparkle}</svg>`);
     return urlCache[k];
   };
+  // calendar: day 0 of each year = 21 March (spring equinox), 364-day years
+  const MONTHS = ['janv.', 'févr.', 'mars', 'avril', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+  const MLEN = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  G.date = function (d, withYear) {
+    const Y = G.SEASON_DAYS * 4, doy = Math.floor(((d % Y) + Y) % Y);
+    let c = (doy + 79) % 365, m = 0;
+    while (c >= MLEN[m]) { c -= MLEN[m]; m = (m + 1) % 12; }
+    return `${c + 1} ${MONTHS[m]}${withYear ? ` an ${Math.floor(d / Y) + 1}` : ''}`;
+  };
+  // durations in days → "2 ans 3 mois", "5 mois", "12 jours"
+  G.dur = function (d) {
+    if (d < 45) return `${Math.max(0, Math.round(d))} jour${Math.round(d) > 1 ? 's' : ''}`;
+    const y = Math.floor(d / 364), mo = Math.floor((d % 364) / 30.3);
+    if (!y) return `${mo} mois`;
+    return `${y} an${y > 1 ? 's' : ''}${mo ? ` ${mo} mois` : ''}`;
+  };
   // "icon|text" messages from the simulation → { icon, text }
   G.splitMsg = function (m) {
     const k = m.indexOf('|');

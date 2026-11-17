@@ -297,12 +297,25 @@
   }
   $('#start').onclick = () => setRunning(!ui.running);
   document.querySelectorAll('#speed button').forEach((b) => (b.onclick = () => { ui.speed = +b.dataset.s; if (!ui.running) ui.running = true; update(); }));
+  ui.tk = () => (ui.speed >= 64 ? 2 : 1);
   $('#clear').onclick = () => {
     const [w, h] = ui.worldForScreen();
     if (w !== S.W || h !== S.H) { G.initWorld(w, h); G.R.initWorld(); } else S.clearAll();
     ui.fitCamera(); G.R.clearDecals(); select(-1); setRunning(false);
   };
-  $('#demo').onclick = () => { G.demo(); ui.fitCamera(); select(-1); setRunning(true); };
+  // new world panel
+  const val = (id) => { const v = $(id).value; return v === '' ? null : +v; };
+  $('#demo').onclick = () => { $('#world').classList.add('show'); };
+  $('#world').addEventListener('click', (e) => { if (e.target.id === 'world' || e.target.closest('#worldX')) $('#world').classList.remove('show'); });
+  function newWorld(opts) {
+    G.demo(opts); ui.fitCamera(); select(-1); setRunning(true);
+    $('#world').classList.remove('show');
+  }
+  ui.newWorld = newWorld;
+  $('#worldGo').onclick = () => {
+    const sd = $('#wSeed').value.trim();
+    newWorld({ water: val('#wWater'), forest: val('#wForest'), predators: val('#wPred'), seed: sd ? parseInt(sd, 10) >>> 0 : null });
+  };
 
   // ------------------------------------------------------------------ toasts + discoveries
   const queue = [];
@@ -390,7 +403,7 @@
     if (st.chron[i] < -0.6) out.push(g('lève-tôt', 'lève-tôt')); else if (st.chron[i] > 0.6) out.push(g('couche-tard', 'couche-tard'));
     return out.length ? out.join(' · ') : g('plutôt équilibré', 'plutôt équilibrée');
   }
-  const fmtDay = (d) => `J${Math.floor(d) + 1} ${String(Math.floor((d % 1) * 24)).padStart(2, '0')}h`;
+  const fmtDay = (d) => G.date(d, true);
   let cardBuilt = -2;
   function renderCard() {
     const c = $('#card');
@@ -398,7 +411,7 @@
       if (cardBuilt !== -3) {
         const o = S.obituary;
         c.innerHTML = `<div class="ch"><span class="tomb">${G.ico('tomb')}</span><div><b>${o.name}</b><small>${o.species}</small></div><button id="cardX" aria-label="Fermer">${G.ico('x')}</button></div>
-          <p>${o.name} est ${o.cause} à ${o.age.toFixed(1)} jours.</p><div class="kv">Petits <b>${o.kids}</b> · Proies <b>${o.kills}</b></div>
+          <p>${o.name} est ${o.cause} à ${G.dur(o.age)}.</p><div class="kv">Petits <b>${o.kids}</b> · Proies <b>${o.kills}</b></div>
           <div class="jr">${S.journal.slice(0, 6).map((j) => `<div><i>${fmtDay(j.d)}</i> ${j.msg}</div>`).join('')}</div>`;
         c.classList.add('show');
         $('#cardX').onclick = () => { S.obituary = null; select(-1); };
@@ -443,7 +456,7 @@
       h += bar('Énergie', S.en[i], '#5cb85c');
       if (u.thirst < 50) h += bar('Hydratation', S.wat[i], '#4aa8e8');
       h += bar('Santé', S.hp[i] / G.UHP[t], '#e8584a');
-      h += `<div class="kv">Âge <b>${S.age[i].toFixed(1)} j</b> <span>· adulte à ${u.mature} j · vit ~${u.life} j</span></div>`;
+      h += `<div class="kv">Âge <b>${G.dur(S.age[i])}</b> <span>· adulte à ${G.dur(u.mature)} · vit ~${G.dur(u.life)}</span></div>`;
       h += `<div class="kv">Caractère <b>${persona(i)}</b></div>`;
       { const dh = Math.hypot(S.x[i] - st.homeX[i], S.y[i] - st.homeY[i]); h += `<div class="kv">Territoire <b>~${(st.hRange[i] / 4).toFixed(0)} m</b> <span>· ${dh < st.hRange[i] ? 'chez ' + (S.sex[i] ? 'lui' : 'elle') : `à ${(dh / 4).toFixed(0)} m de chez ${S.sex[i] ? 'lui' : 'elle'}`}</span></div>`; }
       if (st.mom[i] >= 0) h += `<div class="kv">Mère <b>${S.alive[st.mom[i]] && S.type[st.mom[i]] === t && S.nameI[st.mom[i]] === st.momName[i] ? S.nameOf(st.mom[i]) : S.nameFromSeed(st.momName[i]) + ' †'}</b>${st.fatherName[i] >= 0 ? ` · Père <b>${S.nameFromSeed(st.fatherName[i])}</b>` : ''}</div>`;
@@ -471,7 +484,7 @@
   const GRAPH_COL = ['#c49a78', '#9d9aa4', '#c9692e', '#a8643a', '#5a4434', '#3a271b', '#8a5a34', '#e0702a', '#6a6c74', '#c9a46a', '#7a4c2c', '#d4a020', '#b8966e', '#4a4240', '#2c2a34', '#2f7a4a', '#7a8ea8', '#f0a868', '#5cae4a', '#f5c518', '#ff8a3d'];
   const hidden = new Set(['bee', 'butterfly', 'mouse', 'frog']);
   const YD = G.SEASON_DAYS * 4;
-  const fmtDate = (d) => `an ${Math.floor(d / YD) + 1}, j${Math.floor(d % YD) + 1}`;
+  const fmtDate = (d) => G.date(d, true);
   const tLabel = (d, span) => span > YD * 1.5 ? `an ${Math.floor(d / YD) + 1}` : `jour ${Math.floor(d) + 1}`;
   let gTab = 'pop', evoSp = null;
   function canvasCtx() {
@@ -581,7 +594,8 @@
   function drawChron() {
     const el = $('#chron');
     const list = S.history.slice().reverse();
-    el.innerHTML = list.length ? list.map((e) => `<div class="ce">${G.ico(e.icon)}<i>${fmtDate(e.d)}</i><span>${e.text}</span></div>`).join('') : '<p class="empty">Rien de notable pour l\'instant. Les catastrophes, disparitions, retours d\'espèces et grandes lignées s\'inscriront ici.</p>';
+    el.innerHTML = (S.world ? `<div class="wbar">Monde n° <b>${S.world.seed}</b> <button id="replay">Rejouer ce monde</button><small>même terrain et mêmes animaux au départ ; la suite ne sera jamais identique</small></div>` : '') + (list.length ? list.map((e) => `<div class="ce">${G.ico(e.icon)}<i>${fmtDate(e.d)}</i><span>${e.text}</span></div>`).join('') : '<p class="empty">Rien de notable pour l\'instant. Les catastrophes, disparitions, retours d\'espèces et grandes lignées s\'inscriront ici.</p>');
+    const rb = $('#replay'); if (rb) rb.onclick = () => { $('#graph').classList.remove('show'); newWorld(S.world.opts); };
     $('#legend').innerHTML = ''; $('#gnote').textContent = '';
   }
   function drawGraph() {
@@ -632,7 +646,7 @@
     S.cataRate = +$('#cataRate').value; S.immigration = $('#immig').checked;
     select(-1);
     skip = { years, target: S.time + years * YD * G.DAY, start: snapshot(), t0: S.time };
-    ui.skipping = true; G.fxReal = G.fx; G.fx = noFx; S.setTimeScale(3);
+    ui.skipping = true; G.fxReal = G.fx; G.fx = noFx; S.setTimeScale(4);
     $('#skipSet').style.display = 'none'; $('#skipRun').style.display = 'block';
   }
   ui.skipStep = function () {
@@ -733,7 +747,7 @@
     secret('dodo', () => { if (S.spawnSecret('dodo', 'u:dodo|Un dodo ! Éteint depuis 1681… Protégez-le des renards.') >= 0) S.spawnSecret('dodo', ''); });
     secret('bigfoot', () => { if (S.spawnSecret('bigfoot', 'foot|Tu l\'as appelé…') < 0) toast('Bigfoot ne sort que des forêts.'); });
     secret('licorne', () => S.spawnSecret('unicorn', 'u:unicorn|Tu y crois vraiment ? Bon, d\'accord.'));
-    secret('lune', () => { S.time = Math.floor(S.time / G.DAY / 8) * 8 * G.DAY + 4.95 * G.DAY; toast('Avance rapide jusqu\'à la pleine lune…'); });
+    secret('lune', () => { S.time = (Math.floor(S.time / G.DAY / 30) * 30 + 14.95) * G.DAY; toast('Avance rapide jusqu\'à la pleine lune…'); });
   });
   window.addEventListener('keyup', (e) => {
     if (e.code === 'Space' && e.target.tagName !== 'INPUT') { spaceDown = false; if (mode !== 'pan' && !spaceUsed) setRunning(!ui.running); }
@@ -768,7 +782,7 @@
       const hh = Math.floor(hh0), mm = Math.floor((hh0 - hh) * 60 / 15) * 15;
       const wx = S.rain > 0.3 ? (S.weather === 'snow' ? 'cloudsnow' : S.weather === 'storm' ? 'storm' : 'rain') : S.isNight() ? 'moon' : 'sun';
       const yd = G.SEASON_DAYS * 4;
-      $('#clock').innerHTML = `<b>Année ${Math.floor(day / yd) + 1}</b> · jour ${Math.floor(day % yd) + 1} · ${G.ico(SEASON_ICON[se])} ${SEASONS[se]} · ${G.ico(wx)} ${String(hh).padStart(2, '0')}h${String(mm).padStart(2, '0')}${S.cata ? ` · <span class="cata">${G.ico(S.CATA[S.cata.kind].icon)} ${S.CATA[S.cata.kind].name}</span>` : ''}`;
+      $('#clock').innerHTML = `<b>${G.date(day)}</b> · an ${Math.floor(day / yd) + 1} · ${G.ico(SEASON_ICON[se])} ${SEASONS[se]} · ${G.ico(wx)} ${String(hh).padStart(2, '0')}h${String(mm).padStart(2, '0')}${S.cata ? ` · <span class="cata">${G.ico(S.CATA[S.cata.kind].icon)} ${S.CATA[S.cata.kind].name}</span>` : ''}`;
       let n = 0;
       for (let t = 0; t < G.NSP; t++) if (!(G.UFL[t] & F.STATIC)) n += S.counts[t];
       $('#pop').textContent = `${n.toLocaleString('fr-FR')} animaux`;

@@ -7,6 +7,7 @@
 (function () {
   const F = G.F, HB = G.HB, D = G.D, T = G.T;
   const { MAXU, GC, TC, DAY } = G;
+  const YEAR = G.SEASON_DAYS * 4;
   // the step can be coarsened (×TK) for fast-forwarding years
   let DT = G.DT, TK = 1;
   const UR = G.UR, USPD = G.USPD, URUN = G.URUN, UVIS = G.UVIS, UHP = G.UHP, UFL = G.UFL, UDIET = G.UDIET,
@@ -165,7 +166,7 @@
     sex[i] = rnd() < 0.5 ? 1 : 0;
     const baby = opts && opts.baby;
     age[i] = baby ? 0 : u.mature * (1 + rnd() * 1.5);
-    if (u.mature >= 99) age[i] = 1;
+    if (u.mature >= 1e8) age[i] = 1;
     maxAge[i] = u.life * (0.75 + rnd() * 0.5);
     hp[i] = UHP[t]; en[i] = baby ? 0.85 : 0.65 + rnd() * 0.3; wat[i] = 0.7 + rnd() * 0.3;
     stam[i] = u.stamina || 5; preg[i] = 0; mateCd[i] = rnd() * 0.3; cd[i] = 0; hold[i] = 0; chaseT[i] = 0; atk[i] = 0; flash[i] = 0;
@@ -211,7 +212,7 @@
     if (fl & F.SMALL) return 55;
     return Math.max(60, Math.min(230, USPD[t] * 7 * (u.cat === 'pred' ? 1.5 : 1)));
   }
-  function sizeOf(t, a) { const m = SP[t].mature; return m >= 99 ? 1 : Math.min(1, 0.45 + 0.55 * (a / m)); }
+  function sizeOf(t, a) { const m = SP[t].mature; return m >= 1e8 ? 1 : Math.min(1, 0.45 + 0.55 * (a / m)); }
   function free(i) { pendingFree.push(i); }
   S.remove = function (i) { if (!alive[i]) return; alive[i] = 0; S.count--; free(i); };
 
@@ -526,7 +527,7 @@
       dailyChronicle(dayN, season);
       // unicorn: an ecosystem balanced for a long time
       const sp = speciesAlive();
-      if (dayN >= 6 && sp >= 9 && !S.counts[U.unicorn] && !S.flags['uni' + Math.floor(dayN / 10)] && rnd() < 0.5 && (S.flags['uni' + Math.floor(dayN / 10)] = 1)) spawnSecret('unicorn', 'u:unicorn|Ton écosystème est si équilibré qu\'une licorne est apparue !');
+      if (dayN >= 6 && sp >= 9 && !S.counts[U.unicorn] && !S.flags['uni' + Math.floor(dayN / YEAR)] && rnd() < 0.02 && (S.flags['uni' + Math.floor(dayN / YEAR)] = 1)) spawnSecret('unicorn', 'u:unicorn|Ton écosystème est si équilibré qu\'une licorne est apparue !');
     }
     if (S.cata) updateCatastrophe(dt);
     // weather state machine
@@ -549,7 +550,7 @@
     S.snow += (Math.max(snowT, S.snow * (season === 3 ? 1 : 0)) - S.snow) * Math.min(1, dt * (season === 3 ? 0.08 : 0.15));
     if (season !== 3) S.snow = Math.max(0, S.snow - dt * 0.05);
     // full moon: every 8th night
-    if (dayN % 8 === 4 && (hour > 22 || hour < 2) && S.counts[U.wolf] > 0) {
+    if (dayN % 30 === 15 && (hour > 22 || hour < 2) && S.counts[U.wolf] > 0) {
       if (!S.flags['moon' + dayN]) {
         toast('moon|Pleine lune : les loups hurlent… Aouuuuh !', 'moon' + dayN);
         for (let i = 0; i < hw; i++) if (alive[i] && type[i] === U.wolf) { atk[i] = 1.5; G.fx.note(x[i], y[i] - 10); }
@@ -559,7 +560,7 @@
     if (S.isNight() && rnd() < dt * 0.002 && !S.counts[U.bigfoot] && forestCells > 400) spawnSecret('bigfoot', 'foot|Quelque chose de grand traverse la forêt…');
     // population records
     S.histT += dt;
-    if (S.histT > DAY * 0.1) {
+    if (S.histT > DAY) {
       S.histT = 0;
       let fo = 0; for (let c = 0; c < terr.length; c++) if (terr[c] === T.FOREST) fo++;
       S.hist.push({ t: day, c: Array.from(S.counts), forest: fo / terr.length });
@@ -592,12 +593,12 @@
     for (let i = 0; i < hw; i++) {
       if (!alive[i]) continue;
       const t = type[i];
-      if (UFL[t] & (F.STATIC | F.MAGIC) || SP[t].mature >= 99) continue;
+      if (UFL[t] & (F.STATIC | F.MAGIC) || SP[t].mature >= 1e8) continue;
       n[t]++; if (gen[i] > gmax[t]) gmax[t] = gen[i];
       for (let g = 0; g < NG; g++) sum[t * NG + g] += GENES[g][i];
     }
     for (let t = 0; t < NS; t++) if (n[t]) for (let g = 0; g < NG; g++) sum[t * NG + g] /= n[t];
-    S.geneHist.push({ t: dayN, m: sum, n, g: gmax });
+    if (dayN % 7 === 0) S.geneHist.push({ t: dayN, m: sum, n, g: gmax });
     if (S.geneHist.length > 1200) S.geneHist = S.geneHist.filter((_, k) => k % 2 === 0);
     // extinctions, comebacks, generation milestones
     for (let t = 0; t < NS; t++) {
@@ -610,7 +611,7 @@
     }
     // migrants: a locally extinct species can recolonise from outside the valley
     if (S.immigration === true && dayN > 4) for (let t = 0; t < NS; t++) {
-      if (S.seen[t] !== 2 || UFL[t] & F.HIDDEN || rnd() > 0.02 * G.SEASON_DAYS / 4) continue;
+      if (S.seen[t] !== 2 || UFL[t] & F.HIDDEN || rnd() > 0.3 / YEAR) continue;
       const nn = 2 + ((rnd() * 3) | 0), side = (rnd() * 4) | 0;
       let placed = 0;
       for (let k = 0; k < 80 && placed < nn; k++) {
@@ -622,10 +623,10 @@
       if (placed) { S.seen[t] = 1; chronicle('u:' + SP[t].k, `${placed} ${plural(t)} venus d'ailleurs recolonisent la vallée.`); toast(`u:${SP[t].k}|Des ${plural(t)} venus d'ailleurs arrivent dans la vallée.`); }
     }
     // catastrophes: rare (roughly one every few years), each tied to its season
-    if (!S.cata && dayN > 6 && dayN - S.lastCata > 10 && rnd() < 0.013 * S.cataRate) startCatastrophe(season);
+    if (!S.cata && dayN > 20 && dayN - S.lastCata > 120 && rnd() < 0.22 / YEAR * S.cataRate) startCatastrophe(season);
     // dense populations breed epidemics
-    if (!S.cata && dayN > 6 && dayN - S.lastCata > 6) {
-      for (let t = 0; t < NS; t++) if (!(UFL[t] & (F.STATIC | F.HIDDEN)) && t !== U.bee && S.counts[t] > 120 && rnd() < 0.006 * S.cataRate * S.counts[t] / 120) { startCatastrophe(season, 'epidemic', t); break; }
+    if (!S.cata && dayN > 20 && dayN - S.lastCata > 60) {
+      for (let t = 0; t < NS; t++) if (!(UFL[t] & (F.STATIC | F.HIDDEN)) && t !== U.bee && S.counts[t] > 120 && rnd() < 0.12 / YEAR * S.cataRate * S.counts[t] / 120) { startCatastrophe(season, 'epidemic', t); break; }
     }
   }
   const CATA = {
@@ -644,7 +645,7 @@
     let text = '';
     S.cata = { kind, t: 0, dur: DAY, cells: null };
     if (kind === 'drought') {
-      S.cata.dur = DAY * 3.5; S.growK = 0.2; S.heatK = 1.5;
+      S.cata.dur = DAY * 60; S.growK = 0.25; S.heatK = 1.5;
       // shallow ponds and stream edges dry out
       const cells = [];
       for (let c = 0; c < terr.length; c++) {
@@ -659,12 +660,12 @@
       for (let i = 0; i < hw; i++) if (alive[i] && UHAB[type[i]] === HB.WATER && !canEnter(type[i], terr[tc(x[i], y[i])])) die(i, 'thirst');
       text = 'Sécheresse : l\'herbe jaunit, les mares s\'assèchent et les points d\'eau deviennent rares.';
     } else if (kind === 'fire') {
-      S.cata.dur = DAY * 0.6; S.wind = 0.4;
+      S.cata.dur = DAY * 2; S.wind = 0.4;
       let lit = 0;
       for (let k = 0; k < 4000 && lit < 4; k++) { const c = (rnd() * terr.length) | 0; if ((terr[c] === T.FOREST || terr[c] === T.TALL) && veg[c] > 0.2) { ignite(c); lit++; } }
       text = 'Grand incendie : la foudre est tombée sur une forêt desséchée et le vent attise les flammes.';
     } else if (kind === 'flood') {
-      S.cata.dur = DAY * 1.2;
+      S.cata.dur = DAY * 6;
       const cells = [];
       for (let pass = 0; pass < 3; pass++) {
         const add = [];
@@ -687,21 +688,21 @@
       text = 'Inondation : la rivière sort de son lit après des pluies diluviennes.';
       S.weather = 'rain'; S.weatherT = DAY; S.weatherStart = 0;
     } else if (kind === 'storm') {
-      S.cata.dur = DAY * 0.4; S.wind = 1; S.weather = 'storm'; S.weatherT = DAY * 0.4; S.weatherStart = 0;
+      S.cata.dur = DAY * 1; S.wind = 1; S.weather = 'storm'; S.weatherT = DAY * 0.5; S.weatherStart = 0;
       let felled = 0;
       for (let c = 0; c < terr.length; c++) if (terr[c] === T.FOREST && tAge[c] > 2 && rnd() < 0.05 + tAge[c] * 0.01) { terr[c] = T.GRASS; tvar[c] |= 4; tAge[c] = 0; veg[c] = 0.5; felled++; }
       text = `Tempête : des rafales violentes ont abattu ${felled} arbres. Les clairières vont se repeupler.`;
     } else if (kind === 'winter') {
-      S.cata.dur = DAY * 3; S.coldK = 1.7; S.growK = 0.3;
-      S.weather = 'snow'; S.weatherT = DAY * 2; S.weatherStart = 0;
+      S.cata.dur = DAY * 60; S.coldK = 1.7; S.growK = 0.3;
+      S.weather = 'snow'; S.weatherT = DAY * 3; S.weatherStart = 0;
       text = 'Hiver rigoureux : un froid glacial s\'abat sur la vallée. Seuls les plus robustes passeront l\'hiver.';
     } else if (kind === 'epidemic') {
       let t = ft;
       if (t == null) { let best = 0; for (let k = 0; k < G.NSP; k++) if (!(UFL[k] & (F.STATIC | F.HIDDEN)) && k !== U.bee && S.counts[k] > best) { best = S.counts[k]; t = k; } }
       if (t == null || S.counts[t] < 6) { S.cata = null; return; }
-      S.cata.dur = DAY * 2.5; S.cata.sp = t;
+      S.cata.dur = DAY * 30; S.cata.sp = t;
       let n = 0;
-      for (let i = 0; i < hw; i++) if (alive[i] && type[i] === t && rnd() < 0.35) { sick[i] = 1 + rnd() * 2.5; n++; log(i, 'est tombé malade'); }
+      for (let i = 0; i < hw; i++) if (alive[i] && type[i] === t && rnd() < 0.35) { sick[i] = 8 + rnd() * 12; n++; log(i, 'est tombé malade'); }
       text = `Épidémie : une maladie frappe les ${plural(t)}. Ceux qui ont une bonne immunité ont plus de chances de s'en sortir.`;
     }
     S.lastCata = dayN;
@@ -721,7 +722,7 @@
     S.growK = 1; S.coldK = 1; S.heatK = 1; S.wind = 0;
     if (c.kind === 'epidemic') {
       let n = 0; for (let i = 0; i < hw; i++) if (alive[i] && sick[i] > 0) n++;
-      if (n) { c.t = c.dur - DAY * 0.5; return; } // wait for the last sick animal
+      if (n) { c.t = c.dur - DAY * 3; return; } // wait for the last sick animal
       chronicle('virus', `Fin de l'épidémie chez les ${plural(c.sp)} : ${S.counts[c.sp]} survivants.`);
     }
     if (c.kind === 'flood') chronicle('waves', 'La crue se retire et laisse un limon fertile.');
@@ -875,11 +876,11 @@
       }
     }
     // ------------------------------------------------ 6. reproduction
-    if (adult && u.gest < 50 && en[i] > (fl & F.SMALL || PREY[t] ? 0.55 : 0.68) && (wat[i] > 0.4 || u.thirst > 50) && mateCd[i] <= 0 && preg[i] <= 0 && (u.breed ? u.breed.includes(season) : season !== 3)) {
+    if (adult && u.gest < 1e8 && en[i] > (fl & F.SMALL || PREY[t] ? 0.55 : 0.68) && (wat[i] > 0.4 || u.thirst > 50) && mateCd[i] <= 0 && preg[i] <= 0 && (u.breed ? u.breed.includes(season) : season !== 3)) {
       // deer rut in autumn: males clash
       if (t === U.deer && season === 2 && sex[i] === 1 && rnd() < 0.15) {
         const r = nearest(i, 40, 1 << t, 0);
-        if (r >= 0 && sex[r] === 1 && age[r] >= u.mature) { state[i] = ST.FIGHT; tgt[i] = r; toast('u:deer|Le brame du cerf résonne : deux mâles s\'affrontent !', 'rut' + Math.floor(S.time / DAY / 16)); return; }
+        if (r >= 0 && sex[r] === 1 && age[r] >= u.mature) { state[i] = ST.FIGHT; tgt[i] = r; toast('u:deer|Le brame du cerf résonne : deux mâles s\'affrontent !', 'rut' + Math.floor(S.time / DAY / YEAR)); return; }
       }
       // predators only raise young when their territory holds enough prey (numerical response)
       if (PREYPER[t] && preyCount(t) < PREYPER[t] * (S.counts[t] + 1)) { /* not enough food in the valley to raise young */ }
@@ -1144,7 +1145,7 @@
       // -------------------------------------------- static things
       if (fl & F.STATIC) {
         if (fl & F.CARCASS) {
-          store[i] -= DT / (DAY * 2.5);
+          store[i] -= DT / (DAY * 7);
           if (((tick + i) & 31) === 0) G.fx.fly(x[i], y[i] - 4);
           if (store[i] <= 0) { fertilize(x[i], y[i], 0.6); S.remove(i); }
           else size[i] = Math.min(1.6, 0.45 + store[i] * 0.25);
@@ -1163,22 +1164,22 @@
       size[i] = sizeOf(t, age[i]) * gsz[i];
       const sleeping = state[i] === ST.SLEEP;
       const running = state[i] === ST.FLEE || state[i] === ST.HUNT;
-      if (u.hunger < 50) en[i] -= DT / (u.hunger * DAY) * metab[i] * (sleeping ? (fl & F.HIBERNATE && season === 3 ? 0.08 : 0.45) : running ? 1.8 : state[i] === ST.REST ? 0.7 : 1) * (season === 3 ? (CACHE[t] ? 0.6 : 1.25) * (1.3 - 0.6 * tCoat[i]) * S.coldK : 1) * (sick[i] > 0 ? 1.3 : 1);
+      if (u.hunger < 50) en[i] -= DT / (u.hunger * DAY) * metab[i] * (sleeping ? (fl & F.HIBERNATE && season === 3 ? 0.08 : 0.45) : running ? 1.8 : state[i] === ST.REST ? 0.7 : 1) * (season === 3 ? (CACHE[t] ? 0.3 : 1.25) * (1.3 - 0.6 * tCoat[i]) * S.coldK : 1) * (sick[i] > 0 ? 1.3 : 1);
       if (u.thirst < 50 && !(sleeping && fl & F.HIBERNATE && season === 3)) wat[i] -= DT / (u.thirst * DAY) * metab[i] * (season === 1 ? 1.3 * (0.8 + 0.4 * tCoat[i]) * S.heatK : 1) * (sleeping ? 0.5 : 1);
       if (S.rain > 0.5 && !(fl & F.AIR)) wat[i] = Math.min(1, wat[i] + DT * 0.01);
       if (sick[i] > 0) {
         sick[i] -= DT / DAY;
-        hp[i] -= UHP[t] * DT * 0.022 * (1.25 - tImm[i]) * (sick[i] > 0 ? 1 : 0);
+        hp[i] -= UHP[t] * DT / (DAY * 8) * (1.25 - tImm[i]) * (sick[i] > 0 ? 1 : 0);
         if (hp[i] <= 0) { die(i, 'disease'); continue; }
         if (sick[i] <= 0) log(i, 'a guéri de la maladie');
         // contagion
-        if (((tick + i) % 30) === 0) { const j = nearest(i, 14, 1 << t, 0); if (j >= 0 && sick[j] <= 0 && rnd() < 0.35 * (1.2 - tImm[j])) { sick[j] = 1.5 + rnd() * 2; log(j, 'est tombé malade'); } }
+        if (((tick + i) % 30) === 0) { const j = nearest(i, 14, 1 << t, 0); if (j >= 0 && sick[j] <= 0 && rnd() < 0.06 * (1.2 - tImm[j])) { sick[j] = 8 + rnd() * 12; log(j, 'est tombé malade'); } }
       }
       if (en[i] <= 0) { en[i] = 0; hp[i] -= UHP[t] * DT * 0.05; }
       if (wat[i] <= 0) { wat[i] = 0; hp[i] -= UHP[t] * DT * 0.06; }
       if (age[i] > maxAge[i] && !(fl & F.MAGIC && t !== U.bigfoot && t !== U.unicorn)) { die(i, 'age'); continue; }
       if (hp[i] <= 0) { die(i, en[i] <= 0 ? 'hunger' : wat[i] <= 0 ? 'thirst' : 'wound'); continue; }
-      if (hp[i] < UHP[t] && en[i] > 0.4) hp[i] = Math.min(UHP[t], hp[i] + UHP[t] * DT * 0.01);
+      if (hp[i] < UHP[t] && en[i] > 0.4 && sick[i] <= 0) hp[i] = Math.min(UHP[t], hp[i] + UHP[t] * DT * 0.01);
       if (mateCd[i] > 0) mateCd[i] -= DT / DAY;
       if (cd[i] > 0) cd[i] -= DT;
       // insects don't survive the winter (the hive keeps the colony alive)

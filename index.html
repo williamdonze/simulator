@@ -164,6 +164,15 @@
   .empty { color: var(--muted); font-weight: 500; font-size: 13px; }
   .spsel { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; margin-bottom: 4px; }
   .lg img { width: 18px; height: 18px; } .lg.sel { background: var(--ink); color: #fff; }
+  #world { position: fixed; inset: 0; background: rgba(43,36,51,.35); display: none; place-items: center; z-index: 22; padding: 16px; }
+  #world.show { display: grid; }
+  #wcard { width: min(420px, 100%); padding: 16px; }
+  #wcard h2 { margin: 0 0 6px; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
+  #wcard p { color: var(--muted); font-size: 12.5px; font-weight: 500; margin: 0 0 8px; }
+  #wcard .opt { justify-content: space-between; } #wcard input { font: inherit; width: 130px; padding: 3px 6px; border-radius: 8px; border: 1px solid var(--line); }
+  .cbtns button.go { background: var(--go); color: #fff; padding: 10px; font-size: 14px; }
+  .wbar { font-size: 12.5px; padding: 6px 8px; background: var(--line); border-radius: 10px; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .wbar button { padding: 3px 8px; border-radius: 8px; background: var(--panel); font-size: 12px; } .wbar small { width: 100%; color: var(--muted); font-weight: 500; }
   #skip, #report { position: fixed; inset: 0; background: rgba(43,36,51,.35); display: none; place-items: center; z-index: 22; padding: 16px; }
   #skip.show, #report.show { display: grid; }
   #scard { width: min(460px, 100%); padding: 16px; }
@@ -198,7 +207,7 @@
 <div id="hud" class="panel">
   <div id="clock"></div>
   <div id="hudrow"><span id="pop"></span>
-    <div id="speed"><button data-s="1">×1</button><button data-s="4">×4</button><button data-s="16">×16</button></div>
+    <div id="speed"><button data-s="1">×1</button><button data-s="4">×4</button><button data-s="16">×16</button><button data-s="64" title="Environ 2 minutes par année">×64</button></div>
     <button id="graphBtn" class="hb" title="Populations et évolution" aria-label="Populations et évolution"><svg class="ic" viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-5 4 3 5-7"/></svg></button>
     <button id="chronBtn" class="hb" title="Chronique de la vallée" aria-label="Chronique de la vallée"><svg class="ic" viewBox="0 0 24 24"><path d="M8 21h12a2 2 0 0 0 2-2v-2H10v2a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v3h4M19 17V5a2 2 0 0 0-2-2H4"/></svg></button>
     <button id="bookBtn" class="hb" title="Carnet du naturaliste"><svg class="ic" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg> <span id="bookN"></span></button></div>
@@ -211,7 +220,7 @@
 <div id="card" class="panel"></div>
 
 <div id="ctl">
-  <button id="demo" class="round" title="Charger un monde d'exemple" aria-label="Charger un monde d'exemple"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"/></svg></button>
+  <button id="demo" class="round" title="Créer un nouveau monde" aria-label="Créer un nouveau monde"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"/></svg></button>
   <button id="clear" class="round" title="Tout effacer" aria-label="Tout effacer"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
   <button id="start">▶ Lancer la vie</button>
 </div>
@@ -221,12 +230,19 @@
   <canvas id="graphCv"></canvas><div id="chron"></div><div id="legend"></div><p id="gnote"></p></div></div>
 <div id="skip"><div id="scard" class="panel">
   <div id="skipSet"><h2>Voyage dans le temps <button id="skipX" class="x" aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></h2>
-    <p>La vallée vit en accéléré pendant la durée choisie : naissances, chasses, saisons, générations, catastrophes. À l'arrivée, un rapport résume ce qui s'est passé.</p>
+    <p>La vallée vit en accéléré pendant la durée choisie : naissances, chasses, saisons, générations, catastrophes. Compte environ une demi-minute par année. À l'arrivée, un rapport résume ce qui s'est passé.</p>
     <div id="skipYears"><button data-y="1">1 an</button><button data-y="2">2 ans</button><button data-y="5">5 ans</button><button data-y="10">10 ans</button><button data-y="25">25 ans</button></div>
     <label class="opt">Catastrophes naturelles <select id="cataRate"><option value="0">aucune</option><option value="1">rares (comme dans la nature)</option><option value="3">fréquentes</option></select></label>
     <label class="opt"><input type="checkbox" id="immig"> Des animaux venus d'ailleurs peuvent recoloniser la vallée</label></div>
   <div id="skipRun"><h2>Les années passent…</h2><div id="skipTrack"><div id="skipBar"></div></div><p id="skipInfo"></p><button id="skipStop">Arrêter ici</button></div>
 </div></div>
+<div id="world"><div id="wcard" class="panel"><h2>Nouveau monde <button id="worldX" class="x" aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></h2>
+  <p>Relief, rivières, forêts et animaux sont tirés au hasard. Fixe un paramètre pour tester son effet : moins d'eau, plus de prédateurs…</p>
+  <label class="opt">Eau <select id="wWater"><option value="">au hasard</option><option value="0.02">presque pas</option><option value="0.25">peu</option><option value="0.5">moyennement</option><option value="0.9">beaucoup</option></select></label>
+  <label class="opt">Forêt <select id="wForest"><option value="">au hasard</option><option value="0.08">très peu</option><option value="0.3">un peu</option><option value="0.5">beaucoup</option><option value="0.75">forêt dense</option></select></label>
+  <label class="opt">Prédateurs <select id="wPred"><option value="">au hasard</option><option value="0">rares</option><option value="0.5">normaux</option><option value="1">nombreux</option></select></label>
+  <label class="opt">Numéro de monde <input id="wSeed" inputmode="numeric" placeholder="au hasard"></label>
+  <div class="cbtns"><button id="worldGo" class="go">Créer ce monde</button></div></div></div>
 <div id="report"><div id="rcard" class="panel"><h2><span id="reportTitle"></span> <button id="reportX" class="x" aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></h2><div id="reportBody"></div>
   <div class="cbtns"><button id="reportEvo">Voir les courbes d'évolution</button></div></div></div>
 <div id="book"><div id="bcard" class="panel"><h2>Carnet du naturaliste <button id="bookX" class="x" aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></h2><p>Tout ce que tu as observé dans tes mondes. Tes découvertes restent enregistrées dans ce navigateur.</p><div id="bookGrid"></div></div></div>
@@ -237,6 +253,7 @@
 <script src="js/eco.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/render.js"></script>
+<script src="js/worldgen.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
 </body>
