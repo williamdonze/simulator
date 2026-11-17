@@ -163,7 +163,7 @@
   G.POWER_CATS = ['Création', 'Destruction', 'Climat', 'Vie', 'Évolution', 'Monde'];
   const PW = (G.powers = {
     get: (id) => BY[id],
-    mode: () => S.godMode || 'equilibre',
+    mode: () => S.godMode || 'libre',
     // can it be used now? returns null or a refusal message
     check(id, ctx = {}) {
       const p = BY[id];
@@ -197,7 +197,7 @@
     daily() {
       const d = day();
       // divine energy: slowly regenerates, faster when the world is calm
-      S.mana = Math.min(100, (S.mana == null ? 60 : S.mana) + 1.2 + (S.director && S.director.active.length === 0 ? 0.8 : 0));
+      S.mana = Math.min(100, (S.mana == null ? 100 : S.mana) + 4 + (S.director && S.director.active.length === 0 ? 2 : 0));
       // timed effects run out
       const keep = [];
       for (const e of S.godTimers || []) {
@@ -211,5 +211,5 @@
     },
   });
   G.bus.on('day', () => PW.daily());
-  G.bus.on('reset', () => { S.mana = 60; S.godTimers = []; S.powerCd = {}; });
+  G.bus.on('reset', () => { S.mana = 100; S.godTimers = []; S.powerCd = {}; });
 })();
