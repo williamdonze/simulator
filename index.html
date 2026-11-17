@@ -227,6 +227,7 @@
   .fi b { display: block; font-size: 12.5px; } .fi small { display: block; color: var(--muted); font-size: 10.5px; } .fi span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 500; }
   .fi.s2 { border-left-color: #4aa8e8; } .fi.s3 { border-left-color: #e0a02a; } .fi.s4 { border-left-color: #e8584a; }
   @keyframes fin { from { opacity: 0; transform: translateX(20px); } }
+  .fi.out { opacity: 0; transform: translateX(20px); transition: opacity .5s, transform .5s; }
   #insp { position: fixed; left: 16px; top: 60px; width: 290px; max-height: calc(100vh - 230px); overflow: auto; padding: 12px; display: none; z-index: 7; }
   #insp.show { display: block; }
   .ih { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; } .ih b { flex: 1; font-size: 15px; } .ih img { width: 36px; height: 36px; } .ih .ic { width: 18px; height: 18px; }
