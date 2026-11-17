@@ -39,7 +39,12 @@
   S.watch = -1; S.journal = []; S.obituary = null;
   function log(i, msg) { if (i === S.watch) { S.journal.unshift({ d: S.time / DAY, msg }); if (S.journal.length > 30) S.journal.pop(); } }
   S.log = log;
-  S.stats = { ateP, ateM, ateH, drank, dist, gen, mom, momName, escapes, klog };
+  // individuality: home range, personality (inherited), own needs and daily rhythm
+  const homeX = new Float32Array(MAXU), homeY = new Float32Array(MAXU), hRange = new Float32Array(MAXU), settled = new Uint8Array(MAXU);
+  const tCur = new Float32Array(MAXU), tBold = new Float32Array(MAXU), tSoc = new Float32Array(MAXU), tLazy = new Float32Array(MAXU), tSpd = new Float32Array(MAXU);
+  const thirstTh = new Float32Array(MAXU), hungerTh = new Float32Array(MAXU), metab = new Float32Array(MAXU), chron = new Float32Array(MAXU);
+  const actT = new Float32Array(MAXU), actK = new Uint8Array(MAXU);
+  S.stats = { ateP, ateM, ateH, drank, dist, gen, mom, momName, escapes, klog, homeX, homeY, hRange, tCur, tBold, tSoc, tLazy, tSpd, chron, actK };
   let hw = 0, freeTop = 0;
   const pendingFree = [];
   Object.assign(S, { x, y, px, py, z, hp, en, wat, age, type, alive, sex, state, face, atk, flash, anim, size, vari, team, tgt, home, kills, kids, nameI, burn, store, preg, birthT, maxAge });
@@ -48,8 +53,10 @@
   S.nproj = 0;
 
   // states
-  const ST = (S.ST = { WANDER: 0, GRAZE: 1, SEEK: 2, DRINK: 3, FLEE: 4, HUNT: 5, EAT: 6, MATE: 7, SLEEP: 8, FOLLOW: 9, FIGHT: 10, WORK: 11, HOME: 12, STALK: 13 });
-  S.STATE_NAMES = ['se promène', 'mange', 'cherche à manger', 'va boire', 'fuit !', 'chasse', 'dévore une carcasse', 'cherche un partenaire', 'dort', 'suit sa mère', 'se bat', 'travaille', 'rentre à la ruche', 'est à l\'affût'];
+  const ST = (S.ST = { WANDER: 0, GRAZE: 1, SEEK: 2, DRINK: 3, FLEE: 4, HUNT: 5, EAT: 6, MATE: 7, SLEEP: 8, FOLLOW: 9, FIGHT: 10, WORK: 11, HOME: 12, STALK: 13, REST: 14, EXPLORE: 15, PLAY: 16, ALERT: 17, GROOM: 18, HABIT: 19 });
+  S.STATE_NAMES = ['se promène', 'mange', 'cherche à manger', 'va boire', 'fuit !', 'chasse', 'dévore une carcasse', 'cherche un partenaire', 'dort', 'suit sa mère', 'se bat', 'travaille', 'rentre à la ruche', 'est à l\'affût',
+    'se repose', 'explore les environs', 'joue', 'est aux aguets', 'fait sa toilette', 'fait sa vie'];
+  const isAct = (s) => s === 0 || s >= 14;
 
   // ---------------------------------------------------------------- world
   let W, H, TW, TH, GW, GH, NC;
@@ -122,8 +129,8 @@
   S.hour = () => ((S.time / DAY) % 1) * 24;
   S.season = () => Math.floor(S.time / DAY / G.SEASON_DAYS) % 4; // 0 spring 1 summer 2 autumn 3 winter
   S.isNight = () => { const h = S.hour(); return h < 5.5 || h > 20.5; };
-  function active(t) {
-    const a = SP[t].active, h = S.hour();
+  function active(t, i) {
+    const a = SP[t].active, h = (S.hour() + 24 + (i >= 0 ? chron[i] : 0)) % 24;
     if (a === 'any') return true;
     if (a === 'day') return h > 6 && h < 20.5;
     if (a === 'night') return h < 7 || h > 18.5;
@@ -154,11 +161,29 @@
     birthT[i] = S.time;
     ateP[i] = ateM[i] = ateH[i] = drank[i] = dist[i] = 0; gen[i] = 1; mom[i] = -1; momName[i] = -1; escapes[i] = 0;
     klog.delete(i); S.names.delete(i);
+    // personality: babies inherit from their mother, with a twist
+    const m = baby && opts.home != null && opts.home >= 0 && alive[opts.home] && type[opts.home] === t ? opts.home : -1;
+    const inh = (a) => m >= 0 ? Math.max(0, Math.min(1, a[m] * 0.55 + rnd() * 0.45 + (rnd() - 0.5) * 0.1)) : rnd();
+    tCur[i] = inh(tCur); tBold[i] = inh(tBold); tSoc[i] = inh(tSoc); tLazy[i] = inh(tLazy); tSpd[i] = inh(tSpd);
+    thirstTh[i] = 0.22 + rnd() * 0.22; hungerTh[i] = 0.48 + rnd() * 0.2; metab[i] = 0.85 + rnd() * 0.3;
+    chron[i] = m >= 0 ? chron[m] * 0.5 + (rnd() - 0.5) * 1.6 : (rnd() - 0.5) * 3;
+    homeX[i] = m >= 0 ? homeX[m] : wx; homeY[i] = m >= 0 ? homeY[m] : wy; settled[i] = m >= 0 ? 0 : 1;
+    hRange[i] = baseRange(t) * (0.7 + tCur[i] * 0.6);
+    actT[i] = rnd() * 4; actK[i] = 0;
     size[i] = sizeOf(t, age[i]);
     if (UFL[t] & F.HIVE) store[i] = 8;
     S.count++;
     return i;
   };
+  function baseRange(t) {
+    const fl = UFL[t], u = SP[t];
+    if (t === U.bee || t === U.butterfly) return 130;
+    if (fl & F.AIR) return t === U.crow ? 150 : 240;
+    if (UHAB[t] === HB.WATER) return 90;
+    if (t === U.frog) return 36;
+    if (fl & F.SMALL) return 55;
+    return Math.max(60, Math.min(230, USPD[t] * 7 * (u.cat === 'pred' ? 1.5 : 1)));
+  }
   function sizeOf(t, a) { const m = SP[t].mature; return m >= 99 ? 1 : Math.min(1, 0.45 + 0.55 * (a / m)); }
   function free(i) { pendingFree.push(i); }
   S.remove = function (i) { if (!alive[i]) return; alive[i] = 0; S.count--; free(i); };
@@ -172,6 +197,7 @@
       S.obituary = { name: S.nameOf(i), species: SP[t].name, cause: txt, age: age[i], kids: kids[i], kills: kills[i] };
     }
     alive[i] = 0; S.count--; free(i);
+    if (S.onDeath) S.onDeath(t, cause, killer != null && killer >= 0 ? type[killer] : -1);
     if (UFL[t] & (F.STATIC | F.MAGIC)) { if (UFL[t] & F.MAGIC) G.fx.sparkle(x[i], y[i] - 6, 10); return; }
     const meat = SP[t].meat * size[i];
     G.fx.poof(x[i], y[i] - 3 - z[i] * 0.5);
@@ -515,12 +541,13 @@
     const adult = age[i] >= u.mature;
     // ------------------------------------------------ 1. danger
     if (!(fl & F.NAIVE) && PRED[t] && state[i] !== ST.FIGHT) {
-      const rv = UVIS[t] * (S.isNight() && !(u.active === 'night') ? 0.6 : 1);
+      const rv = UVIS[t] * (S.isNight() && !(u.active === 'night') ? 0.6 : 1) * (state[i] === ST.ALERT ? 1.35 : state[i] === ST.REST || state[i] === ST.PLAY ? 0.8 : 1);
       const p = nearest(i, rv, PRED[t], 0);
       if (p >= 0) {
         const pd = Math.hypot(x[p] - xi, y[p] - yi);
         const hunting = state[p] === ST.HUNT || state[p] === ST.STALK;
-        if (pd < rv * 0.45 || (hunting && tgt[p] === i) || (hunting && pd < rv * 0.8)) {
+        const shy = 1 - tBold[i];
+        if (pd < rv * (0.28 + 0.34 * shy) || (hunting && tgt[p] === i) || (hunting && pd < rv * (0.6 + 0.35 * shy))) {
           // stand and fight?
           if (fl & F.FIGHT && adult && hunting && tgt[p] >= 0 && type[tgt[p]] === t && Math.hypot(x[tgt[p]] - xi, y[tgt[p]] - yi) < 60) {
             const mates = countNear(i, 45, 1 << t);
@@ -551,20 +578,29 @@
     // ------------------------------------------------ 2. sleep / hibernate
     const season = S.season();
     if (fl & F.HIBERNATE && season === 3 && en[i] > 0.15) { state[i] = ST.SLEEP; return; }
-    if (!active(t) && en[i] > 0.3 && (wat[i] > 0.3 || u.thirst > 50)) { state[i] = ST.SLEEP; return; }
-    // ------------------------------------------------ 3. follow mother
-    if (!adult && age[i] < u.mature * 0.6 && home[i] >= 0 && alive[home[i]] && type[home[i]] === t) { state[i] = ST.FOLLOW; tgt[i] = home[i]; return; }
-    // ------------------------------------------------ 4. thirst
-    if (u.thirst < 50 && wat[i] < 0.35 && !(fl & F.AIR && wat[i] > 0.15)) {
-      state[i] = ST.DRINK; return;
+    if (!active(t, i) && en[i] > 0.3 && (wat[i] > 0.3 || u.thirst > 50)) { state[i] = ST.SLEEP; return; }
+    // ------------------------------------------------ 3. thirst (anticipated: the further the water, the earlier they leave)
+    if (u.thirst < 50 && !(fl & F.AIR && wat[i] > 0.15)) {
+      const wd = wdist[cellOf[i]];
+      const margin = wd === 65535 ? 0 : wd * GC / (USPD[t] * 0.6) / (u.thirst * DAY) * 1.8;
+      if (wat[i] < thirstTh[i] + margin || (state[i] === ST.DRINK && wat[i] < 0.97)) { state[i] = ST.DRINK; return; }
     }
+    // ------------------------------------------------ 4. follow mother
+    if (!adult && age[i] < u.mature * 0.6 && home[i] >= 0 && alive[home[i]] && type[home[i]] === t && (en[i] > 0.3 || !MAMMAL[t])) {
+      const mo = home[i];
+      if (state[i] === ST.PLAY && actT[i] > 0) return;
+      const calm = state[mo] === ST.REST || state[mo] === ST.GRAZE || state[mo] === ST.GROOM || state[mo] === ST.SLEEP || state[mo] === ST.DRINK;
+      if (calm && Math.hypot(x[mo] - xi, y[mo] - yi) < 30 && rnd() < 0.06 + tCur[i] * 0.08) { startPlay(i, t); return; }
+      state[i] = ST.FOLLOW; tgt[i] = mo; return;
+    }
+    if (adult && !settled[i]) disperse(i, t, fl);
     // ------------------------------------------------ 5. hunger
-    const hungry = en[i] < 0.6 || (state[i] === ST.GRAZE && en[i] < 0.97) || (state[i] === ST.EAT && en[i] < 0.98);
+    const hungry = en[i] < hungerTh[i] || (state[i] === ST.GRAZE && en[i] < 0.97) || (state[i] === ST.EAT && en[i] < 0.98);
     if (hungry) {
       // carcass?
       if (diet & D.CARRION || (diet & D.MEAT && en[i] < 0.5)) {
-        const c = nearest(i, diet & D.CARRION ? UVIS[t] : UVIS[t] * 0.5, 1 << U.carcass, 3);
-        if (c >= 0) { state[i] = ST.EAT; tgt[i] = c; return; }
+        const c = cd[i] > 0 && !(fl & F.AIR) ? -1 : nearest(i, diet & D.CARRION ? UVIS[t] : UVIS[t] * 0.5, 1 << U.carcass, 3);
+        if (c >= 0) { if (state[i] !== ST.EAT || tgt[i] !== c) chaseT[i] = 0; state[i] = ST.EAT; tgt[i] = c; return; }
       }
       // honey
       if (diet & D.HONEY && en[i] < 0.7) {
@@ -595,10 +631,13 @@
           if (!inWorld(sx, sy)) continue;
           const c = tc(sx, sy), tt = terr[c];
           if (!canEnter(t, tt) && !(t === U.bear && TWATER[tt])) continue;
-          const v = G.FOOD[t * NTT + tt] * veg[c] - d / rad * 0.15;
+          const dh = Math.hypot(sx - homeX[i], sy - homeY[i]) - hRange[i];
+          const v = G.FOOD[t * NTT + tt] * veg[c] - d / rad * 0.15 - (dh > 0 ? dh / hRange[i] * 0.35 : 0);
           if (v > bv) { bv = v; best = c; bx = sx; by = sy; }
         }
         if (best >= 0) { state[i] = ST.SEEK; goalX[i] = bx; goalY[i] = by; return; }
+        // nothing to eat around here: look for a better home
+        if (en[i] < 0.35 && rnd() < 0.08) { relocate(i, t, fl, 'ne trouve plus rien à manger et part chercher un meilleur coin'); return; }
       }
     }
     // ------------------------------------------------ 6. reproduction
@@ -608,18 +647,147 @@
         const r = nearest(i, 40, 1 << t, 0);
         if (r >= 0 && sex[r] === 1 && age[r] >= u.mature) { state[i] = ST.FIGHT; tgt[i] = r; toast('🦌 Le brame du cerf résonne : deux mâles s\'affrontent !', 'rut' + Math.floor(S.time / DAY / 16)); return; }
       }
-      const crowd = countNear(i, 50, 1 << t);
-      if (crowd < (fl & F.SMALL ? 14 : 9)) {
+      const crowd = countNear(i, fl & F.SMALL ? 72 : 55, 1 << t);
+      // solitary predators are territorial: no cubs if the neighbourhood is already full
+      if (crowd < (fl & F.SMALL ? 14 : u.cat === 'pred' ? (countNear(i, fl & F.PACK ? 170 : 110, 1 << t) < (fl & F.PACK ? 7 : 4) ? 9 : 0) : 9)) {
         const m = nearest(i, UVIS[t], 1 << t, 2);
         if (m >= 0) { state[i] = ST.MATE; tgt[i] = m; return; }
       }
     }
-    // ------------------------------------------------ 7. social & wander
-    if (fl & (F.HERD | F.PACK)) {
-      const m = herdCenter(i, fl & F.PACK ? 120 : 70);
-      if (m) { state[i] = ST.WANDER; return; }
+    // ------------------------------------------------ 7. daily life: every individual does its own thing
+    if (isAct(state[i]) && actT[i] > 0) return;
+    chooseActivity(i, t, u, fl, adult);
+  }
+
+  // what an animal says it's doing (species habits have their own words)
+  const HABIT = {
+    rabbit: 'fait des bonds de joie', mouse: 'grignote une graine', squirrel: 'cache une noisette', deer: 'bondit sur place',
+    boar: 'fouille le sol du groin', bison: 'se roule dans la poussière', beaver: 'entretient sa hutte', fox: 'bondit sur un mulot',
+    wolf: 'hurle', lynx: 'aiguise ses griffes', bear: 'se frotte contre un arbre', eagle: 'plane dans un courant chaud',
+    owl: 'hulule', vulture: 'tournoie très haut', crow: 'joue avec un caillou brillant', duck: 'barbote la tête sous l\'eau',
+    heron: 'se tient sur une patte', fish: 'saute hors de l\'eau', frog: 'coasse', butterfly: 'se pose sur une fleur',
+  };
+  const HABIT_T = new Array(G.NSP).fill(null);
+  for (const k in HABIT) if (U[k] != null) HABIT_T[U[k]] = HABIT[k];
+  S.stateName = function (i) {
+    const s = state[i], t = type[i];
+    if (s === ST.HABIT) {
+      if (t === U.boar && (terr[tc(x[i], y[i])] === T.MUD || nearWater(x[i], y[i]))) return 'se vautre dans la boue';
+      return HABIT_T[t] || S.STATE_NAMES[s];
     }
-    if (state[i] !== ST.WANDER) { state[i] = ST.WANDER; tgt[i] = -1; }
+    if (s === ST.EXPLORE) return actK[i] === 2 ? 'cherche son propre territoire' : actK[i] === 1 ? 'rentre sur son territoire' : actK[i] === 3 ? 's\'aventure hors de son territoire' : 'explore son territoire';
+    if (s === ST.PLAY && tgt[i] >= 0) return 'joue avec ' + (age[tgt[i]] < SP[t].mature ? 'un frère' : 'sa mère');
+    return S.STATE_NAMES[s];
+  };
+
+  // species that nurse their young
+  const MAMMAL = new Uint8Array(G.NSP);
+  for (const k of ['rabbit', 'mouse', 'squirrel', 'deer', 'boar', 'bison', 'beaver', 'fox', 'wolf', 'lynx', 'bear']) if (U[k] != null) MAMMAL[U[k]] = 1;
+  function setExplore(i, t, gx, gy, k, dur) {
+    goalX[i] = Math.max(4, Math.min(W - 4, gx)); goalY[i] = Math.max(4, Math.min(H - 4, gy));
+    state[i] = ST.EXPLORE; actK[i] = k; actT[i] = dur || 40; tgt[i] = -1;
+  }
+  // a random reachable spot at distance d0..d1 from (cx, cy), suited to the species
+  function spotNear(i, t, fl, cx, cy, d0, d1, drink) {
+    const wet = UHAB[t] === HB.AMPHI || UHAB[t] === HB.SHORE;
+    for (let k = 0; k < 10; k++) {
+      const a = rnd() * 6.283, d = d0 + rnd() * (d1 - d0);
+      const sx = cx + Math.cos(a) * d, sy = cy + Math.sin(a) * d;
+      if (!inWorld(sx, sy)) continue;
+      if (!(fl & F.AIR) && !okAt(t, sx, sy)) continue;
+      if (wet && wdist[((sy / GC) | 0) * GW + ((sx / GC) | 0)] > 2) continue;
+      if (drink && SP[t].thirst < 50 && wdist[((sy / GC) | 0) * GW + ((sx / GC) | 0)] * GC > 200) continue;
+      if ((fl & F.ARBOREAL) && fdist[((sy / GC) | 0) * GW + ((sx / GC) | 0)] > 2) continue;
+      return [sx, sy];
+    }
+    return null;
+  }
+  // young adults leave the family (in herds, daughters stay: philopatry)
+  function disperse(i, t, fl) {
+    settled[i] = 1;
+    if ((fl & F.HERD && sex[i] === 0) || (fl & F.PACK && rnd() < 0.5) || t === U.fish || t === U.butterfly) return;
+    const R = hRange[i];
+    const p = spotNear(i, t, fl, x[i], y[i], R * 1.2, R * 2.6, true);
+    if (!p) return;
+    homeX[i] = p[0]; homeY[i] = p[1];
+    setExplore(i, t, p[0], p[1], 2, 60);
+    log(i, 'est devenu adulte et quitte sa famille pour fonder son propre territoire');
+  }
+  function relocate(i, t, fl, why) {
+    const R = hRange[i];
+    const p = spotNear(i, t, fl, x[i], y[i], R * 0.8, R * 2, true);
+    if (!p) return;
+    homeX[i] = p[0]; homeY[i] = p[1];
+    setExplore(i, t, p[0], p[1], 2, 50);
+    log(i, why);
+  }
+  function startPlay(i, t) {
+    state[i] = ST.PLAY; actT[i] = 3 + rnd() * 5;
+    const sib = nearest(i, 40, 1 << t, 0);
+    tgt[i] = sib >= 0 && (age[sib] < SP[t].mature || sib === home[i]) ? sib : -1;
+    if (tgt[i] >= 0 && rnd() < 0.3) log(i, tgt[i] === home[i] ? 'a joué avec sa mère' : `a joué avec ${S.nameOf(tgt[i])}`);
+  }
+  function chooseActivity(i, t, u, fl, adult) {
+    tgt[i] = -1;
+    const R = hRange[i], dh = Math.hypot(x[i] - homeX[i], y[i] - homeY[i]);
+    const air = fl & F.AIR, insect = t === U.butterfly, fish = UHAB[t] === HB.WATER;
+    // strayed too far: go home (curious ones tolerate more)
+    if (dh > R * (1.05 + tCur[i] * 0.5)) {
+      const p = spotNear(i, t, fl, homeX[i], homeY[i], 0, R * 0.5);
+      if (p) { setExplore(i, t, p[0], p[1], 1, 45); if (dh > R * 1.6) log(i, 'rentre sur son territoire'); return; }
+    }
+    // herds & packs synchronise: animals copy what a nearby mate is doing
+    if (fl & (F.HERD | F.PACK) && rnd() < 0.25 + tSoc[i] * 0.6) {
+      const m = nearest(i, fl & F.PACK ? 90 : 55, 1 << t, 0);
+      if (m >= 0 && isAct(state[m]) && actT[m] > 0.5 && state[m] !== ST.PLAY) {
+        state[i] = state[m]; actK[i] = actK[m] === 2 ? 0 : actK[m]; actT[i] = actT[m] * (0.7 + rnd() * 0.5);
+        if (state[m] === ST.EXPLORE) { goalX[i] = goalX[m] + (rnd() - 0.5) * 24; goalY[i] = goalY[m] + (rnd() - 0.5) * 24; }
+        return;
+      }
+    }
+    const season = S.season(), h = S.hour(), hot = season === 1 && h > 11 && h < 16;
+    const full = en[i] > 0.85;
+    const lazy = tLazy[i], cur = tCur[i];
+    let hab = HABIT_T[t] ? 0.45 : 0;
+    if (t === U.wolf) hab = S.isNight() || h < 7 || h > 19 ? 0.9 : 0.05;
+    if (t === U.owl || t === U.frog) hab = S.isNight() || h < 7 || h > 19 ? 0.9 : 0.1;
+    if (t === U.squirrel && season === 2) hab = 1.6;
+    if (t === U.boar && season === 1) hab = 1.1;
+    const w = [
+      0.9,                                                         // wander
+      insect ? 0.5 : 0.5 + lazy * 1.6 + (hot ? 1.4 : 0) + (full ? 0.7 : 0), // rest (ruminate, digest, siesta)
+      0.35 + cur * 1.5,                                            // explore
+      PRED[t] && !insect ? 0.15 + (1 - tBold[i]) * 0.9 : 0,        // alert
+      insect || fish || air ? 0.05 : 0.35,                         // groom
+      !adult ? 1.5 : age[i] < u.mature * 1.4 ? cur * 0.4 : 0,      // play (young)
+      hab,                                                         // species habit
+    ];
+    let sum = 0; for (const v of w) sum += v;
+    let r = rnd() * sum, k = 0;
+    while (k < w.length - 1 && (r -= w[k]) > 0) k++;
+    switch (k) {
+      case 0: state[i] = ST.WANDER; actT[i] = 3 + rnd() * 7; break;
+      case 1: state[i] = ST.REST; actT[i] = (4 + rnd() * 10) * (0.6 + lazy); break;
+      case 2: {
+        const far = cur > 0.7 && rnd() < 0.18 && !fish;
+        const p = spotNear(i, t, fl, homeX[i], homeY[i], far ? R * 1.3 : R * 0.2, far ? R * 2 : R * (0.6 + cur * 0.4));
+        if (p) { setExplore(i, t, p[0], p[1], far ? 3 : 0, 35); if (far) log(i, 's\'aventure hors de son territoire, par curiosité'); }
+        else { state[i] = ST.WANDER; actT[i] = 4; }
+        break;
+      }
+      case 3: state[i] = ST.ALERT; actT[i] = 1.5 + rnd() * 3.5; break;
+      case 4: state[i] = ST.GROOM; actT[i] = 2.5 + rnd() * 4; break;
+      case 5: startPlay(i, t); break;
+      default:
+        state[i] = ST.HABIT; actT[i] = 2.5 + rnd() * 4; actK[i] = 0;
+        if (t === U.wolf) {
+          toast('🐺 La meute hurle à la lune…', 'howl' + Math.floor(S.time / DAY));
+          // the whole pack joins the chorus
+          const m = nearest(i, 110, 1 << t, 0);
+          if (m >= 0 && isAct(state[m])) { state[m] = ST.HABIT; actT[m] = actT[i]; }
+        }
+        if (rnd() < 0.35 && HABIT_T[t]) log(i, HABIT_T[t]);
+    }
   }
 
   function countNear(i, rad, mask) {
@@ -746,8 +914,8 @@
       size[i] = sizeOf(t, age[i]);
       const sleeping = state[i] === ST.SLEEP;
       const running = state[i] === ST.FLEE || state[i] === ST.HUNT;
-      if (u.hunger < 50) en[i] -= DT / (u.hunger * DAY) * (sleeping ? (fl & F.HIBERNATE && season === 3 ? 0.08 : 0.45) : running ? 1.8 : 1) * (season === 3 ? 1.25 : 1);
-      if (u.thirst < 50 && !(sleeping && fl & F.HIBERNATE && season === 3)) wat[i] -= DT / (u.thirst * DAY) * (season === 1 ? 1.3 : 1) * (sleeping ? 0.5 : 1);
+      if (u.hunger < 50) en[i] -= DT / (u.hunger * DAY) * metab[i] * (sleeping ? (fl & F.HIBERNATE && season === 3 ? 0.08 : 0.45) : running ? 1.8 : 1) * (season === 3 ? 1.25 : 1);
+      if (u.thirst < 50 && !(sleeping && fl & F.HIBERNATE && season === 3)) wat[i] -= DT / (u.thirst * DAY) * metab[i] * (season === 1 ? 1.3 : 1) * (sleeping ? 0.5 : 1);
       if (S.rain > 0.5 && !(fl & F.AIR)) wat[i] = Math.min(1, wat[i] + DT * 0.01);
       if (en[i] <= 0) { en[i] = 0; hp[i] -= UHP[t] * DT * 0.05; }
       if (wat[i] <= 0) { wat[i] = 0; hp[i] -= UHP[t] * DT * 0.06; }
@@ -802,13 +970,75 @@
     en[i] -= 0.15;
   }
 
+  // species-specific little habits
+  function habit(i, t, u, fl, ci) {
+    const ph = S.time * 6 + i, tick = S.tick + i;
+    const hop = (hgt, f) => { z[i] = Math.max(0, Math.sin(S.time * f + i)) * hgt; };
+    switch (t) {
+      case U.rabbit: { // binky: zigzag dash with leaps
+        if ((tick % 18) === 0) { const a = Math.atan2(dY[i], dX[i]) + (rnd() - 0.5) * 2.4; dX[i] = Math.cos(a); dY[i] = Math.sin(a); }
+        mvs = 0.9; hop(3.2, 10); break;
+      }
+      case U.deer: hop(3, 7); mvs = 0.25; break; // stotting
+      case U.fox: { // mouse pounce: freeze, then leap forward
+        const p = (actT[i] % 2.2) / 2.2;
+        if (p > 0.72) { mvs = 0.8; z[i] = Math.sin((p - 0.72) / 0.28 * Math.PI) * 5; }
+        else { mvs = 0; z[i] = 0; if ((tick % 30) === 0) face[i] = -face[i]; }
+        break;
+      }
+      case U.fish: { const p = (actT[i] % 1.6) / 1.6; z[i] = p > 0.6 ? Math.sin((p - 0.6) / 0.4 * Math.PI) * 6 : 0; mvs = 0.5; if (p > 0.6 && p < 0.63 && (tick & 1)) G.fx.dust(x[i], y[i], 3); break; }
+      case U.wolf: case U.owl: case U.frog:
+        if ((tick % (t === U.frog ? 40 : 70)) === 0) G.fx.note(x[i], y[i] - UR[t] * 2 - z[i]);
+        if (t === U.owl && z[i] > 0) z[i] = Math.max(0, z[i] - 0.5);
+        break;
+      case U.boar: case U.bison: {
+        atk[i] = (tick & 15) < 6 ? 0.08 : 0;
+        if ((tick % 24) === 0) { if (t === U.bison) G.fx.dust(x[i], y[i], 4); else G.fx.debris(x[i], y[i], 0xff4a6a8a, 2); face[i] = -face[i]; }
+        if (t === U.boar && !(terr[ci] === T.MUD) && (tick % 90) === 0 && veg[ci] < 0.3 && rnd() < 0.25 && terr[ci] === T.GRASS) S.setTerrain(ci, T.DIRT);
+        break;
+      }
+      case U.bear: { // walk to a tree, then scratch
+        if (terr[ci] !== T.FOREST && fdist[cellOf[i]] > 0 && fdist[cellOf[i]] < 8) { dX[i] = fdx[cellOf[i]]; dY[i] = fdy[cellOf[i]]; norm(i); mvs = 0.5; actT[i] += DT * 0.8; }
+        else atk[i] = (tick & 31) < 10 ? 0.08 : 0;
+        break;
+      }
+      case U.lynx: case U.mouse: case U.crow: case U.beaver: case U.squirrel:
+        atk[i] = (tick & 15) < 5 ? 0.06 : 0;
+        if (fl & F.AIR && z[i] > 0) z[i] = Math.max(0, z[i] - 0.5);
+        if (t === U.squirrel && S.season() === 2 && terr[ci] === T.FOREST && rnd() < 0.002) plantNut(i);
+        if (t === U.beaver && (tick % 40) === 0) beaverWork(i);
+        break;
+      case U.eagle: case U.vulture: { // thermal: tight climbing circles
+        const a = Math.atan2(dY[i], dX[i]) + 0.05; dX[i] = Math.cos(a); dY[i] = Math.sin(a);
+        mvs = 0.45; z[i] = Math.min(UALT[t] * 1.5, z[i] + 0.15); break;
+      }
+      case U.duck: atk[i] = (tick % 60) < 25 ? 0.1 : 0; mvs = 0.1; break;
+      case U.heron: mvs = 0; break;
+      case U.butterfly: if (z[i] > 0.5) z[i] -= 0.3; mvs = 0; break;
+      default: atk[i] = ph % 3 < 1 ? 0.05 : 0;
+    }
+  }
+  function goHome(i, t, fl) {
+    const R = hRange[i];
+    if (Math.hypot(x[i] - homeX[i], y[i] - homeY[i]) < R * 0.35) return;
+    const p = spotNear(i, t, fl, homeX[i], homeY[i], 0, R * 0.45);
+    if (p) setExplore(i, t, p[0], p[1], 1, 40);
+  }
   function act(i, t, u, fl, ci) {
     mvs = 0;
     const s = state[i];
     const j = tgt[i];
+    if (isAct(s)) actT[i] -= DT;
+    if (!(fl & F.AIR) && z[i] !== 0 && s !== ST.HABIT && s !== ST.PLAY) z[i] = Math.max(0, z[i] - 0.5);
     switch (s) {
       case ST.WANDER: {
-        mvs = fl & F.AIR ? (t === U.vulture || t === U.eagle ? 0.7 : 0.6) : 0.35;
+        mvs = fl & F.AIR ? (t === U.vulture || t === U.eagle ? 0.7 : 0.6) : 0.25 + 0.2 * (1 - tLazy[i]);
+        // keep to the home range, and to the herd for social animals
+        if (((S.tick + i) % 12) === 0) {
+          if (fl & (F.HERD | F.PACK) && tSoc[i] > 0.3) herdCenter(i, fl & F.PACK ? 120 : 70);
+          const hx = homeX[i] - x[i], hy = homeY[i] - y[i], dh = Math.hypot(hx, hy);
+          if (dh > hRange[i] * 0.7 && t !== U.vulture && t !== U.eagle) { dX[i] += hx / dh * 0.5; dY[i] += hy / dh * 0.5; norm(i); }
+        }
         // smooth random walk
         const turn = (fl & F.AIR) && (t === U.vulture || t === U.eagle) ? 0.035 : (rnd() - 0.5) * 0.35;
         const a = Math.atan2(dY[i], dX[i]) + turn;
@@ -818,7 +1048,58 @@
         if ((fl & F.ARBOREAL || t === U.lynx || t === U.bigfoot) && fdist[cellOf[i]] > 1) { dX[i] = dX[i] * 0.4 + fdx[cellOf[i]]; dY[i] = dY[i] * 0.4 + fdy[cellOf[i]]; norm(i); }
         if (t === U.butterfly && terr[ci] === T.FLOWERS) mvs = 0.25;
         if (fl & F.AIR && z[i] < UALT[t]) z[i] = Math.min(UALT[t], z[i] + 0.8);
-        if ((S.tick + i) % 120 < 30 && !(fl & F.AIR)) mvs = 0; // pauses
+        if (((S.tick + i * 7) % 150) < 20 && !(fl & F.AIR)) mvs = 0; // short pauses to sniff around
+        break;
+      }
+      case ST.REST: {
+        if (fl & F.AIR) { if (z[i] > 0) z[i] = Math.max(0, z[i] - 0.5); if (t === U.butterfly && z[i] <= 0) z[i] = 0.5; }
+        if (((S.tick + i) % 200) === 0 && rnd() < 0.3) face[i] = -face[i];
+        break;
+      }
+      case ST.ALERT: {
+        // stand still, ears up, scanning left and right
+        if (((S.tick + i) % 35) === 0) face[i] = -face[i];
+        if (fl & F.AIR && z[i] < UALT[t]) z[i] += 0.5;
+        break;
+      }
+      case ST.GROOM: {
+        atk[i] = ((S.tick + i) & 15) < 5 ? 0.05 : 0;
+        if (fl & F.AIR && z[i] > 0) z[i] = Math.max(0, z[i] - 0.5);
+        break;
+      }
+      case ST.EXPLORE: {
+        const l = steerTo(i, goalX[i], goalY[i]);
+        // meander a little: nobody walks in a straight line
+        const a = Math.atan2(dY[i], dX[i]) + Math.sin(S.time * 0.9 + i * 1.7) * 0.45;
+        dX[i] = Math.cos(a); dY[i] = Math.sin(a);
+        mvs = actK[i] === 2 ? 0.75 : actK[i] === 1 ? 0.6 : 0.42 + tCur[i] * 0.25;
+        if (fl & F.AIR && z[i] < UALT[t]) z[i] = Math.min(UALT[t], z[i] + 0.8);
+        if (l < 6 || actT[i] <= 0) {
+          if (actK[i] === 2 && l < 6) log(i, 's\'installe sur son nouveau territoire');
+          state[i] = ST.WANDER; actT[i] = 0; actK[i] = 0;
+        }
+        break;
+      }
+      case ST.PLAY: {
+        if (j >= 0 && alive[j]) {
+          // chase each other in circles
+          const dx = x[j] - x[i], dy = y[j] - y[i], l = Math.hypot(dx, dy) || 1, sd = (i & 1) ? 1 : -1;
+          dX[i] = dx / l * (l > 10 ? 0.9 : -0.2) - dy / l * sd; dY[i] = dy / l * (l > 10 ? 0.9 : -0.2) + dx / l * sd; norm(i);
+          mvs = 0.7;
+          if (l < UR[t] * 2.5 && ((S.tick + i) % 25) === 0) atk[i] = 0.15;
+        } else {
+          const a = Math.atan2(dY[i], dX[i]) + 0.09 * ((i & 1) ? 1 : -1);
+          dX[i] = Math.cos(a); dY[i] = Math.sin(a); mvs = 0.6;
+        }
+        const mo = home[i];
+        if (mo >= 0 && alive[mo] && type[mo] === t && age[i] < u.mature) { const dm = Math.hypot(x[mo] - x[i], y[mo] - y[i]); if (dm > 34) steerTo(i, x[mo], y[mo]); }
+        if (!(fl & F.AIR) && UHAB[t] !== HB.WATER) z[i] = Math.abs(Math.sin(S.time * 9 + i)) * UR[t] * 0.35; // little hops
+        if (actT[i] <= 0) { state[i] = ST.WANDER; tgt[i] = -1; }
+        break;
+      }
+      case ST.HABIT: {
+        habit(i, t, u, fl, ci);
+        if (actT[i] <= 0) { state[i] = ST.WANDER; actT[i] = 0; }
         break;
       }
       case ST.SLEEP: {
@@ -838,7 +1119,7 @@
         if (t === U.squirrel && terr[ci] === T.FOREST && rnd() < 0.0015) plantNut(i);
         if (((S.tick + i) & 15) < 8) atk[i] = 0.1;
         mvs = 0.05;
-        if (en[i] > 0.98) state[i] = ST.WANDER;
+        if (en[i] > 0.98) { state[i] = ST.WANDER; actT[i] = 0; }
         break;
       }
       case ST.SEEK: {
@@ -876,7 +1157,7 @@
       case ST.DRINK: {
         if (TWATER[terr[ci]] || nearWater(x[i], y[i])) {
           mvs = 0; wat[i] = Math.min(1, wat[i] + DT / (DAY * 0.04)); atk[i] = 0.1; drank[i] += DT / (DAY * 0.04);
-          if (wat[i] > 0.97) state[i] = ST.WANDER;
+          if (wat[i] > 0.97) { state[i] = ST.WANDER; actT[i] = 0; goHome(i, t, fl); }
           // bears fish while standing in the river
           break;
         }
@@ -937,6 +1218,8 @@
         if (j < 0 || !alive[j]) { state[i] = ST.WANDER; break; }
         const l = steerTo(i, x[j], y[j]);
         mvs = 0.8;
+        chaseT[i] += DT;
+        if (chaseT[i] > 14 && l > UR[t] + UR[type[j]] + 2) { state[i] = ST.WANDER; tgt[i] = -1; cd[i] = 10; actT[i] = 0; break; } // can't reach it
         if (fl & F.AIR) z[i] = Math.max(0, Math.min(UALT[t], (l - 4) * 0.8));
         if (l < UR[t] + UR[type[j]] + 2) {
           mvs = 0; atk[i] = 0.15;
@@ -972,6 +1255,12 @@
         const l = steerTo(i, gx, gy);
         mvs = l > 3 ? Math.min(1, l / 20 + 0.3) : 0;
         if (state[j] === ST.FLEE) mvs = 1;
+        // mammals suckle while the mother rests or grazes
+        if (MAMMAL[t] && l < 8 && (state[j] === ST.REST || state[j] === ST.GRAZE || state[j] === ST.SLEEP || state[j] === ST.GROOM || state[j] === ST.DRINK) && en[i] < 0.97) {
+          const g = DT / (DAY * 0.12);
+          en[i] = Math.min(1, en[i] + g); en[j] = Math.max(0.05, en[j] - g * 0.35 * size[i]); atk[i] = 0.05;
+          if (wat[i] < 0.9) wat[i] += g * 0.5;
+        }
         break;
       }
       case ST.FIGHT: {
@@ -1048,7 +1337,7 @@
   function move(i, t, fl) {
     if (mvs <= 0) { anim[i] += 0; return; }
     const ci = tc(x[i], y[i]);
-    let sp = (state[i] === ST.FLEE || state[i] === ST.HUNT ? URUN[t] : USPD[t]) * mvs;
+    let sp = (state[i] === ST.FLEE || state[i] === ST.HUNT ? URUN[t] : USPD[t]) * mvs * (0.86 + tSpd[i] * 0.28);
     if (!(fl & F.AIR)) sp *= TSPD[terr[ci]] || 0.3;
     if (age[i] < SP[t].mature) sp *= 0.75 + 0.25 * size[i];
     if (S.snow > 0.5 && !(fl & F.AIR)) sp *= 0.8;
@@ -1057,7 +1346,7 @@
     if (okAt(t, nx, ny)) { x[i] = nx; y[i] = ny; }
     else if (okAt(t, nx, y[i])) { x[i] = nx; dY[i] = -dY[i] * 0.5; norm(i); }
     else if (okAt(t, x[i], ny)) { y[i] = ny; dX[i] = -dX[i] * 0.5; norm(i); }
-    else { const a = Math.atan2(dY[i], dX[i]) + Math.PI * (0.6 + rnd() * 0.8); dX[i] = Math.cos(a); dY[i] = Math.sin(a); if (state[i] === ST.SEEK) state[i] = ST.WANDER; }
+    else { const a = Math.atan2(dY[i], dX[i]) + Math.PI * (0.6 + rnd() * 0.8); dX[i] = Math.cos(a); dY[i] = Math.sin(a); if (state[i] === ST.SEEK || state[i] === ST.EXPLORE) { state[i] = ST.WANDER; actT[i] = 1; } }
     if (dX[i] > 0.15) face[i] = 1; else if (dX[i] < -0.15) face[i] = -1;
     anim[i] += sp * DT * 0.22;
     dist[i] += sp * DT;

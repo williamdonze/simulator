@@ -359,7 +359,21 @@
   $('#book').addEventListener('click', (e) => { if (e.target.id === 'book' || e.target.id === 'bookX') $('#book').classList.remove('show'); });
 
   // ------------------------------------------------------------------ animal sheet
-  const STATE_ICON = ['🚶', '🌿', '👀', '💧', '💨', '🎯', '🍖', '💕', '💤', '🐾', '⚔️', '🔨', '🏠', '🫣'];
+  const STATE_ICON = ['🚶', '🌿', '👀', '💧', '💨', '🎯', '🍖', '💕', '💤', '🐾', '⚔️', '🔨', '🏠', '🫣', '😌', '🧭', '🤸', '👂', '🧼', '✨'];
+  // personality, in words
+  function persona(i) {
+    const st = S.stats, m = S.sex[i] === 1, g = (a, b) => (m ? a : b), out = [];
+    const tr = [
+      [st.tCur[i], g('curieux', 'curieuse'), g('casanier', 'casanière')],
+      [st.tBold[i], g('téméraire', 'téméraire'), g('craintif', 'craintive')],
+      [st.tSoc[i], 'sociable', 'solitaire'],
+      [st.tLazy[i], g('paresseux', 'paresseuse'), 'infatigable'],
+      [st.tSpd[i], 'rapide', g('lent', 'lente')],
+    ];
+    for (const [v, hi, lo] of tr) { if (v > 0.72) out.push(hi); else if (v < 0.28) out.push(lo); }
+    if (st.chron[i] < -0.9) out.push(g('lève-tôt', 'lève-tôt')); else if (st.chron[i] > 0.9) out.push(g('couche-tard', 'couche-tard'));
+    return out.length ? out.join(' · ') : g('plutôt équilibré', 'plutôt équilibrée');
+  }
   const fmtDay = (d) => `J${Math.floor(d) + 1} ${String(Math.floor((d % 1) * 24)).padStart(2, '0')}h`;
   let cardBuilt = -2;
   function renderCard() {
@@ -408,12 +422,14 @@
     if (u.flags & F.CARCASS) h += `<p>Reste de nourriture : ${S.store[i].toFixed(1)}. Elle nourrit charognards et prédateurs, puis fertilise le sol.</p>`;
     else if (u.flags & F.HIVE) h += `<p>Miel en réserve : ${S.store[i].toFixed(1)}</p>`;
     else {
-      h += `<p class="st">${STATE_ICON[S.state[i]]} ${S.STATE_NAMES[S.state[i]]}${S.preg[i] > 0 ? ' · attend des petits 🍼' : ''}</p>`;
+      h += `<p class="st">${STATE_ICON[S.state[i]] || '🐾'} ${S.stateName(i)}${S.preg[i] > 0 ? ' · attend des petits 🍼' : ''}</p>`;
       const bar = (lbl, v, col) => `<div class="bar"><span>${lbl}</span><i><em style="width:${Math.max(0, Math.min(100, v * 100))}%;background:${col}"></em></i></div>`;
       h += bar('Énergie', S.en[i], '#5cb85c');
       if (u.thirst < 50) h += bar('Hydratation', S.wat[i], '#4aa8e8');
       h += bar('Santé', S.hp[i] / G.UHP[t], '#e8584a');
       h += `<div class="kv">Âge <b>${S.age[i].toFixed(1)} j</b> <span>· adulte à ${u.mature} j · vit ~${u.life} j</span></div>`;
+      h += `<div class="kv">Caractère <b>${persona(i)}</b></div>`;
+      { const dh = Math.hypot(S.x[i] - st.homeX[i], S.y[i] - st.homeY[i]); h += `<div class="kv">Territoire <b>~${(st.hRange[i] / 4).toFixed(0)} m</b> <span>· ${dh < st.hRange[i] ? 'chez ' + (S.sex[i] ? 'lui' : 'elle') : `à ${(dh / 4).toFixed(0)} m de chez ${S.sex[i] ? 'lui' : 'elle'}`}</span></div>`; }
       if (st.mom[i] >= 0) h += `<div class="kv">Mère <b>${S.alive[st.mom[i]] && S.type[st.mom[i]] === t && S.nameI[st.mom[i]] === st.momName[i] ? S.nameOf(st.mom[i]) : S.nameFromSeed(st.momName[i]) + ' †'}</b></div>`;
       const eat = [];
       if (st.ateP[i] > 0.05) eat.push(`🌿 ${(st.ateP[i] * 10).toFixed(0)} bouchées de plantes`);

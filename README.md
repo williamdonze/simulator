@@ -11,7 +11,8 @@ Ouvre `index.html` dans un navigateur récent (WebGL2). Aucune installation. Le 
 - **Zoom** : molette (vers le curseur), boutons + / − / ⤢, ou pincement sur mobile. **Se déplacer** : clic droit ou molette enfoncée, Espace + glisser, deux doigts.
 - **✋ Attraper / observer** (onglet Outils) : clique sur un animal pour ouvrir sa fiche, glisse-le pour le déplacer (double-clic : fiche depuis n'importe quel outil).
 - **Fiche d'un animal** :
-  - nom modifiable, sexe, génération, mère ;
+  - nom modifiable, sexe, génération, mère, caractère et territoire ;
+  - ce qu'il fait en ce moment (sieste, exploration, toilette, jeu, habitude de son espèce…) ;
   - faim, soif, santé ;
   - ce qu'il a mangé (plantes, viande, miel, eau), ses proies par espèce, ses petits, ses fuites, la distance parcourue ;
   - son journal de vie, et un hommage à sa mort avec la cause ;
@@ -22,6 +23,9 @@ Ouvre `index.html` dans un navigateur récent (WebGL2). Aucune installation. Le 
 
 - **Végétation vivante** : l'herbe repousse selon la saison et la pluie. Trop broutée, elle laisse la terre à nu, qui se recolonise ensuite. La forêt gagne lentement sur les prairies. Les écureuils oublient des noix qui deviennent des arbres. Les abeilles pollinisent et les fleurs se répandent. Après un incendie, les cendres redeviennent prairie.
 - **Besoins** : faim, soif (il faut de l'eau sur la carte), sommeil selon le rythme de l'espèce (diurne, nocturne, crépusculaire), vieillissement, mort.
+- **Individualité** : chaque animal a son caractère (curieux ou casanier, téméraire ou craintif, sociable ou solitaire, paresseux ou infatigable, rapide ou lent, lève-tôt ou couche-tard), hérité en partie de sa mère. Il a aussi ses propres seuils de faim et de soif et son métabolisme.
+- **Territoire** : chacun vit dans son domaine vital. Il va boire puis rentre chez lui, et anticipe sa soif selon la distance de l'eau. Devenus adultes, les jeunes quittent leur famille pour fonder leur territoire ; dans les hardes, les femelles restent. Les prédateurs solitaires ne se reproduisent pas si le coin est déjà occupé, et une seule meute par territoire.
+- **Vie quotidienne** : repos et siestes aux heures chaudes, exploration (les plus curieux s'aventurent au-delà de leur territoire), guet, toilette, jeux des petits qui tètent leur mère, et une habitude propre à chaque espèce : bonds de joie du lapin, mulot chassé au bond par le renard, bain de boue du sanglier, ours qui se frotte aux arbres, hurlements de la meute, aigle qui monte dans un courant chaud, poisson qui saute, héron sur une patte… Les troupeaux se synchronisent : quand l'un se couche, les autres suivent souvent.
 - **Reproduction** : mâles et femelles, gestation, portées, petits qui suivent leur mère (les canetons en file indienne). La croissance est freinée par la densité et les saisons.
 - **Chaîne alimentaire** :
   - les lapins, cerfs, bisons, souris et écureuils broutent ;

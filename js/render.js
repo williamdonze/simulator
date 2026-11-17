@@ -603,7 +603,7 @@
       const f = objF[k], sc = objS[k];
       put(x, y, fw[f] * sc, fh[f] * sc, 0, f, objC[k], MISC_MULT, (y + 64) | 0);
     }
-    const SLEEP = S.ST.SLEEP, disco = S.disco > 0;
+    const SLEEP = S.ST.SLEEP, REST = S.ST.REST, disco = S.disco > 0;
     const night = S.isNight();
     for (let i = 0; i < hwu; i++) {
       if (!ual[i]) continue;
@@ -622,13 +622,14 @@
         else if (uatk[i] > 0 && z > 3) f = base[o + 2];
         else f = base[o + ((((now * (UR[t] < 2 ? 30 : 6)) | 0) + i) & 1)];
         if (z > 1) { key = Math.min(NKEY - 1, key + 2000); z += Math.sin(now * 2 + i) * 0.8; }
-      } else if (ust[i] === SLEEP) f = base[o + 3];
+      } else if (ust[i] === SLEEP || (ust[i] === REST && !(fl & F.STATIC) && UHAB[t] !== 1)) f = base[o + 3];
       else if (uatk[i] > 0) f = base[o + 2];
       else {
         const ph = uan[i];
         f = base[o + (moving ? ((ph | 0) & 1) : 0)];
         if (moving && !(fl & F.STATIC) && UHAB[t] !== 1) bob = Math.abs(Math.sin(ph * 3.14159)) * 0.5;
       }
+      if (!(fl & F.AIR) && uz[i] > 0) z = uz[i]; // hops & leaps
       const sc = usz[i];
       let col = 0xffffffff, fla = ufl[i] > 0 ? 160 : 0, alphaA = 255;
       if (uvar[i] === 1) { col = 0xff40d8ff; }                 // golden
