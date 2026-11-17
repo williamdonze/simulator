@@ -111,23 +111,35 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 #err{position:fixed;inset:0;display:none;place-items:center;background:#222;color:#fff;font-size:18px;z-index:20;padding:20px;text-align:center}
 
 @media (max-width:760px){
-  #panel{left:8px;right:8px;top:auto;bottom:8px;width:auto;height:44vh;border-radius:18px}
-  #panel.min{height:auto}
-  #panel.min #items,#panel.min #info,#panel.min .sliders,#panel.min .scen,#panel.min .tabs{display:none}
+  #panel{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:48vh;border-radius:18px}
+  #panel.min #items,#panel.min .sliders,#panel.min .scen,#panel.min .tabs,#panel.min .teams{display:none}
   #collapse{display:block}
-  #panel header{padding:10px 12px 4px}
-  #items{grid-template-columns:repeat(4,1fr)}
+  #panel header{padding:10px 12px 6px}
+  #panel header small{display:none}
+  #panel header h1{font-size:17px}
+  .teams{padding:2px 12px 8px}
+  .team{padding:6px}
+  .tabs{padding:0 12px 6px}
+  #items{flex:none;display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:74px;overflow-x:auto;overflow-y:hidden;padding:2px 12px 8px}
+  .item canvas{width:40px;height:40px}
   #info{display:none}
+  .sliders{padding:0 12px 4px}
+  .scen{padding:2px 12px 10px}
+  .scen .ttl{display:none}
+  .scen .row{flex-wrap:nowrap;overflow-x:auto}
+  .scen button{white-space:nowrap}
   #top{left:8px;right:8px;top:8px}
   #counts{padding:6px 10px;min-width:0;width:100%}
   #counts .n{min-width:48px;font-size:15px}
-  #controls{left:8px;right:8px;bottom:calc(44vh + 16px)}
-  #panel.min ~ #controls{bottom:84px}
-  .cbtn{height:40px;min-width:40px;padding:0 9px;font-size:14px}
-  #go{font-size:16px;padding:0 14px}
+  #controls{left:8px;right:8px;top:58px;bottom:auto}
+  #controls .wrap{padding:6px;gap:6px;border-radius:16px}
+  .cbtn{height:38px;min-width:38px;padding:0 9px;font-size:14px;border-radius:11px}
+  #go{font-size:15px;padding:0 14px}
   .cbtn .lbl{display:none}
-  #hint{left:50%;top:30%}
-  #perf{top:56px}
+  #hint{left:50%;top:32%}
+  #hint h2{font-size:22px}#hint p{font-size:14px}
+  #perf{display:none}
+  #toast{top:112px}
 }
 </style>
 </head>
@@ -1780,9 +1792,10 @@ function resize() {
 }
 function fitCamera() {
   const mob = cssW <= 760;
-  const availW = mob ? cssW - 16 : cssW - 310, availH = mob ? cssH * 0.56 - 60 : cssH - 140;
+  const top = mob ? 110 : 70, bottom = mob ? cssH * 0.5 : cssH - 80;
+  const availW = mob ? cssW - 16 : cssW - 310, availH = bottom - top;
   cam.z = Math.min(availW / W, availH / H);
-  cam.x = W / 2 - (mob ? 0 : 149) / cam.z; cam.y = H / 2 + (mob ? cssH * 0.2 : 4) / cam.z;
+  cam.x = W / 2 - (mob ? 0 : 149) / cam.z; cam.y = H / 2 - ((top + bottom) / 2 - cssH / 2) / cam.z;
 }
 window.addEventListener('resize', resize); resize();
 
