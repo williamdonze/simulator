@@ -276,7 +276,7 @@
   }
   const objS = [];
   function rebuildObjects() {
-    const S = G.S, terr = S.terr, tvar = S.tvar, fire = S.fireT, veg = S.veg, TW = S.TW, TC = G.TC;
+    const S = G.S, terr = S.terr, tvar = S.tvar, fire = S.fireT, veg = S.veg, TW = S.TW, TC = G.TC, tAge = S.tAge;
     const FR = G.FR;
     const season = S.season ? S.season() : 0;
     nObj = 0;
@@ -292,11 +292,14 @@
           else if (season === 3) f = FR.treeW;
           else if (season === 2) f = FR['treeA' + ((v >> 4) & 1)];
           else f = FR['tree' + ((v >> 4) % 3)];
-          if (v & 1 && veg[c] < 0.6) { f = FR.sapling; }
+          // trees grow: sapling, then a young tree that fills out over ~3 years
+          const ag = tAge ? tAge[c] : 3;
+          if (ag < 0.5) f = FR.sapling, sc = 0.7 + ag * 0.6;
+          else sc = 0.55 + 0.45 * Math.min(1, (ag - 0.5) / 2.5);
           if (fire[c] > 0) col = 0xff3070ff;
           break;
         }
-        case T.BUSH: f = season === 3 ? FR.bushW : veg[c] > 0.45 && season > 0 ? FR.bushB : FR.bush; break;
+        case T.BUSH: f = season === 3 ? FR.bushW : veg[c] > 0.45 && season > 0 && (!tAge || tAge[c] > 0.6) ? FR.bushB : FR.bush; if (tAge) sc = 0.5 + 0.5 * Math.min(1, tAge[c] / 1.2); break;
         case T.FLOWERS: if (season !== 3 && veg[c] > 0.25 && ((v >> 6) & 3) !== 3) { f = FR['flower' + ((v >> 4) % 5)]; sc = 0.8 + veg[c] * 0.3; } break;
         case T.TALL: if (((v >> 6) & 3) !== 3) { f = season === 3 || veg[c] < 0.3 ? FR.tuftD : FR.tuft; sc = 0.6 + veg[c] * 0.6; } break;
         case T.REEDS: if ((v >> 6) & 1 || (v >> 3) & 1) f = FR.reed; break;
@@ -603,7 +606,7 @@
       const f = objF[k], sc = objS[k];
       put(x, y, fw[f] * sc, fh[f] * sc, 0, f, objC[k], MISC_MULT, (y + 64) | 0);
     }
-    const SLEEP = S.ST.SLEEP, REST = S.ST.REST, disco = S.disco > 0;
+    const SLEEP = S.ST.SLEEP, REST = S.ST.REST, disco = S.disco > 0, gcoat = S.stats && S.stats.tCoat;
     const night = S.isNight();
     for (let i = 0; i < hwu; i++) {
       if (!ual[i]) continue;
@@ -632,6 +635,7 @@
       if (!(fl & F.AIR) && uz[i] > 0) z = uz[i]; // hops & leaps
       const sc = usz[i];
       let col = 0xffffffff, fla = ufl[i] > 0 ? 160 : 0, alphaA = 255;
+      if (gcoat && !(fl & F.STATIC)) { const k = 255 - ((gcoat[i] * 70) | 0); col = (0xff000000 | (k << 16) | (k << 8) | Math.min(255, k + 12)) >>> 0; } // thick coat = darker fur
       if (uvar[i] === 1) { col = 0xff40d8ff; }                 // golden
       else if (uvar[i] === 2) { fla = Math.max(fla, 150); }    // albino
       if (disco) { const h = (now * 2 + i * 0.37) % 1; col = hsl(h); }

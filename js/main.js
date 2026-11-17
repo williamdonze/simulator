@@ -47,7 +47,7 @@
     put('butterfly', 10, 0.42, 0.62, 0.64, 0.92);
     S.spawn(U.hive, 0.47 * W, 0.7 * H); S.spawn(U.hive, 0.58 * W, 0.84 * H);
     S.buildGrid();
-    ui.toast('🌍 Une vallée vivante : regarde la chaîne alimentaire s\'équilibrer. Astuce : 🔍 Loupe dans Outils.');
+    ui.toast('globe|Une vallée vivante : regarde la chaîne alimentaire s\'équilibrer. Essaie aussi le voyage dans le temps.');
   };
 
   G.initWorld(...ui.worldForScreen());
@@ -62,6 +62,13 @@
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     let simDt = 0;
+    if (ui.skipping) {
+      ui.skipStep();
+      R.draw(1, dt, 0);
+      ui.update(now);
+      requestAnimationFrame(frame);
+      return;
+    }
     if (ui.running) {
       acc += dt * ui.speed;
       const t0 = performance.now();
